@@ -1,0 +1,1167 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天機 (Tianji) | AI 紫微投資顧問</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/app.js"></script>
+    <script src="/nav.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'midnight': '#0B1120',
+                        'surface': '#1e293b',
+                        'gold': '#F59E0B',
+                        'purple-accent': '#8B5CF6',
+                        'risk-high': '#EF4444',
+                        'risk-low': '#10B981',
+                        'star-major': '#EC4899', // Pink
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Merriweather', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Merriweather:wght@700&display=swap');
+        
+        body { background-color: #0B1120; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Chart Grid - Modern 4x4 */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 12px;
+            aspect-ratio: 1;
+        }
+
+        .palace-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 12px;
+            position: relative;
+            padding: 28px 8px 8px 8px; /* Increased top padding to avoid overlap */
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            overflow: hidden;
+            cursor: help; /* Pointer for tooltip */
+        }
+        
+        .palace-card:hover {
+            transform: translateY(-2px);
+            background: rgba(30, 41, 59, 0.9);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            border-color: rgba(139, 92, 246, 0.3);
+            z-index: 10;
+        }
+
+        /* Watermark Branch Name */
+        .branch-watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 5rem;
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.03);
+            pointer-events: none;
+            font-family: 'Merriweather', serif;
+            z-index: 0;
+        }
+
+        /* Branch Label (New) */
+        .branch-label {
+            position: absolute;
+            top: 6px;
+            left: 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #64748b;
+            font-family: 'Inter', sans-serif;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 1px 5px;
+            border-radius: 4px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        /* Palace Name Badge */
+        .palace-badge {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #94a3b8;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* Wealth Palace Highlight */
+        .palace-card.wealth-highlight {
+            border: 1px solid rgba(245, 158, 11, 0.5);
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(245, 158, 11, 0.05) 100%);
+        }
+        
+        .palace-card.wealth-highlight .palace-badge {
+            color: #F59E0B;
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        /* Star Styles */
+        .star-item { font-size: 0.85rem; margin-bottom: 2px; display: flex; align-items: center; }
+        .star-major { color: #EC4899; font-weight: 600; }
+        .star-wealth { color: #F59E0B; text-shadow: 0 0 10px rgba(245, 158, 11, 0.3); }
+        .star-bad { color: #EF4444; }
+        .star-good { color: #F59E0B; }
+        .star-power { color: #8B5CF6; }
+
+        /* Transformation Badge (Lu, Quan, Ke, Ji) */
+        .trans-badge {
+            font-size: 0.6rem;
+            margin-left: 4px;
+            padding: 0px 4px;
+            border-radius: 2px;
+            font-weight: bold;
+        }
+        .bg-lu { background: rgba(245, 158, 11, 0.2); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .bg-ji { background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .bg-quan { background: rgba(139, 92, 246, 0.2); color: #8B5CF6; border: 1px solid rgba(139, 92, 246, 0.3); }
+        .bg-ke { background: rgba(59, 130, 246, 0.2); color: #3B82F6; border: 1px solid rgba(59, 130, 246, 0.3); }
+
+        /* Grid Areas */
+        .area-si { grid-area: 1 / 1; } .area-wu { grid-area: 1 / 2; } .area-wei { grid-area: 1 / 3; } .area-shen { grid-area: 1 / 4; }
+        .area-chen { grid-area: 2 / 1; } .area-you { grid-area: 2 / 4; }
+        .area-mao { grid-area: 3 / 1; } .area-xu { grid-area: 3 / 4; }
+        .area-yin { grid-area: 4 / 1; } .area-chou { grid-area: 4 / 2; } .area-zi { grid-area: 4 / 3; } .area-hai { grid-area: 4 / 4; }
+        .area-center { grid-column: 2 / span 2; grid-row: 2 / span 2; }
+    </style>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script></head>
+<body>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="fixed inset-0 bg-midnight z-50 flex flex-col items-center justify-center hidden">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500 mb-4"></div>
+        <div class="text-purple-300 font-serif text-xl animate-pulse">正在推演天機...</div>
+    </div>
+
+    <!-- Tooltip (New) -->
+    <div id="palace-tooltip" class="fixed z-50 hidden max-w-xs bg-slate-800/95 backdrop-blur-md border border-slate-600 rounded-lg shadow-2xl p-4 text-sm pointer-events-none transition-opacity duration-200">
+        <div id="tip-title" class="font-bold text-gold mb-2 border-b border-slate-600 pb-1 text-base"></div>
+        <div id="tip-trans-influence" class="mb-3 text-xs text-yellow-200 border-l-2 border-yellow-500 pl-2 hidden space-y-1"></div>
+        <div id="tip-stars-influence" class="mb-3 text-xs text-slate-300 border-l-2 border-blue-500 pl-2 hidden space-y-1"></div>
+        <div id="tip-flow-summary" class="mb-3 text-xs text-purple-200 border-l-2 border-purple-500 pl-2 hidden"></div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <div class="text-green-400 font-bold mb-1 border-b border-green-900/50 pb-1">【宜】 DO</div>
+                <ul id="tip-do" class="list-none text-slate-300 text-xs space-y-1"></ul>
+            </div>
+            <div>
+                <div class="text-red-400 font-bold mb-1 border-b border-red-900/50 pb-1">【忌】 DON'T</div>
+                <ul id="tip-dont" class="list-none text-slate-300 text-xs space-y-1"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="min-h-screen flex flex-col lg:flex-row max-w-7xl mx-auto p-4 lg:p-8 gap-8">
+        
+        <!-- Left Column: Input & Results -->
+        <div class="w-full lg:w-1/3 flex flex-col gap-6">
+            
+            <!-- Branding -->
+            <div class="flex justify-between items-center text-center lg:text-left mb-4">
+                <div>
+                    <h1 class="text-4xl font-serif font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-gold">天機 Tianji</h1>
+                    <p class="text-slate-400 text-sm mt-2">AI 驅動的紫微斗數投資顧問</p>
+                </div>
+                <button onclick="toggleGlossary()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm border border-slate-600 flex items-center transition">
+                    <span class="mr-2">📖</span> 命理辭典
+                </button>
+            </div>
+
+            <!-- Input Card -->
+            <div class="bg-surface rounded-2xl p-6 shadow-xl border border-slate-700">
+                <h2 class="text-lg font-semibold text-slate-200 mb-4 flex items-center">
+                    <span class="w-1 h-6 bg-purple-500 rounded mr-2"></span> 輸入生辰與目標時間
+                </h2>
+                <form id="calcForm" class="space-y-4">
+                    <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700 space-y-3">
+                        <div class="text-sm font-medium text-slate-300 mb-2">本命生辰 (西元)</div>
+                        <div class="grid grid-cols-4 gap-2">
+                            <div class="col-span-1">
+                                <label class="block text-xs text-slate-400 mb-1">西元年</label>
+                                <input type="number" id="year" value="1990" class="w-full bg-midnight border border-slate-600 rounded px-2 py-2 text-white focus:border-purple-500 outline-none transition text-sm" placeholder="如: 1990">
+                            </div>
+                            <div class="col-span-1">
+                                <label class="block text-xs text-slate-400 mb-1">出生月</label>
+                                <select id="month" class="w-full bg-midnight border border-slate-600 rounded px-2 py-2 text-white outline-none text-sm">
+                                    <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+                                    <option value="5">5</option><option value="6" selected>6</option><option value="7">7</option><option value="8">8</option>
+                                    <option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                                </select>
+                            </div>
+                            <div class="col-span-1">
+                                <label class="block text-xs text-slate-400 mb-1">出生日</label>
+                                <select id="day" class="w-full bg-midnight border border-slate-600 rounded px-2 py-2 text-white outline-none text-sm"></select>
+                            </div>
+                            <div class="col-span-1">
+                                <label class="block text-xs text-slate-400 mb-1">出生時辰</label>
+                                <select id="hour" class="w-full bg-midnight border border-slate-600 rounded px-2 py-2 text-white outline-none text-sm">
+                                    <option value="0">子(23-1)</option><option value="1">丑(1-3)</option><option value="3">寅(3-5)</option>
+                                    <option value="5">卯(5-7)</option><option value="7">辰(7-9)</option><option value="9">巳(9-11)</option>
+                                    <option value="11">午(11-13)</option><option value="13">未(13-15)</option><option value="15">申(15-17)</option>
+                                    <option value="17">酉(17-19)</option><option value="19">戌(19-21)</option><option value="21">亥(21-23)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+                        <div class="text-sm font-medium text-blue-300 mb-2">目標計算時間</div>
+                        <label class="block text-xs text-slate-400 mb-1">選擇你想查看流年/流月/流日的具體日期</label>
+                        <input type="date" id="targetDate" class="w-full bg-midnight border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 outline-none transition">
+                    </div>
+
+                    <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 rounded-lg shadow-lg transform active:scale-95 transition-all">
+                        開始排盤分析
+                    </button>
+                </form>
+            </div>
+
+            <!-- Backtesting Section (New Phase 2) -->
+            <div id="backtest-box" class="hidden bg-surface rounded-2xl p-6 shadow-xl border border-slate-700 animate-fade-in-up mt-4">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-lg font-semibold text-slate-200 flex items-center">
+                        <span class="w-1 h-6 bg-purple-500 rounded mr-2"></span> 歷史回測 (Backtest)
+                    </h2>
+                    <span id="bt-roi-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-700 text-slate-300">Calculating...</span>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-midnight p-4 rounded border border-slate-700">
+                        <div class="text-xs text-slate-400">初始本金</div>
+                        <div id="bt-initial" class="text-xl font-bold text-slate-200">100,000</div>
+                    </div>
+                    <div class="bg-midnight p-4 rounded border border-slate-700">
+                        <div class="text-xs text-slate-400">最終價值</div>
+                        <div id="bt-final" class="text-xl font-bold text-gold">--</div>
+                    </div>
+                </div>
+
+                <div class="text-sm text-slate-300 mb-4 bg-slate-800/50 p-3 rounded border border-slate-700">
+                    <strong class="text-amber-500 flex items-center mb-1"><span class="mr-2">📊</span> 策略運作原理</strong>
+                    本系統利用每日的台股 (TAIEX) 歷史收盤價，將您的先天命盤結合動態的「流日運勢」進行歷史回測，以此驗證紫微斗數在股市波段操作的勝率：<br>
+                    <div class="mt-2 space-y-1 pl-2 border-l-2 border-slate-600">
+                        <div class="text-green-400"><span class="font-bold">進場條件 (BUY)：</span>當「流日」或「流年」的<span class="text-gold">財帛宮</span>逢<span class="text-gold font-bold text-base">化祿</span>星，象徵資金活水旺盛、獲利機遇大增，系統將動用所有資金全倉買進。</div>
+                        <div class="text-red-400"><span class="font-bold">出場條件 (SELL)：</span>當「流日」或「流年」的<span class="text-gold">財帛宮</span>逢<span class="text-blue-400 font-bold text-base">化忌</span>星，象徵破財風險提高、投資判斷易失準，系統將全數賣出空手觀望，以利避險。</div>
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-400 mb-2 font-bold">歷史交易紀錄 (History)</div>
+                <div class="h-[200px] overflow-y-auto bg-midnight rounded border border-slate-700 p-2 text-xs space-y-1" id="bt-trades-list">
+                    <!-- Trade rows will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Strategy Card (Hidden initially) -->
+            <div id="strategyBox" class="hidden bg-surface rounded-2xl p-6 shadow-xl border border-slate-700 animate-fade-in-up">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-lg font-semibold text-slate-200 flex items-center">
+                        <span class="w-1 h-6 bg-gold rounded mr-2"></span> 投資策略
+                    </h2>
+                    <span id="s-risk-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-700 text-slate-300">Evaluating...</span>
+                </div>
+                
+                <div class="mb-6 text-center">
+                    <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">建議行動</div>
+                    <div id="s-action" class="text-3xl font-serif font-bold text-white">WAIT</div>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <div class="text-xs text-slate-400 mb-2">重點關注板塊</div>
+                        <div id="s-sectors" class="flex flex-wrap gap-2"></div>
+                    </div>
+                    
+                    <div class="bg-midnight/50 rounded-lg p-4 border border-slate-700/50">
+                        <div class="text-xs text-slate-400 mb-2 font-semibold text-purple-300">AI 分析報告</div>
+                        <div id="s-analysis" class="text-sm text-slate-300 leading-relaxed"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Chart -->
+        <div class="w-full lg:w-2/3 flex flex-col">
+            
+            <!-- Layer Selectors -->
+            <div class="flex gap-2 mb-4 overflow-x-auto justify-center md:justify-start pb-2 custom-scrollbar">
+                <button onclick="switchChartLayer('natal')" id="layer-btn-natal" class="layer-btn px-4 py-2 rounded-lg text-sm font-bold bg-purple-600 text-white border border-purple-500 shadow-lg shadow-purple-500/30 transition whitespace-nowrap">先天命盤</button>
+                <button onclick="switchChartLayer('decade')" id="layer-btn-decade" class="layer-btn px-4 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-slate-200 transition whitespace-nowrap">大運盤</button>
+                <button onclick="switchChartLayer('annual')" id="layer-btn-annual" class="layer-btn px-4 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-slate-200 transition whitespace-nowrap">流年盤</button>
+                <button onclick="switchChartLayer('monthly')" id="layer-btn-monthly" class="layer-btn px-4 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-slate-200 transition whitespace-nowrap">流月盤</button>
+                <button onclick="switchChartLayer('daily')" id="layer-btn-daily" class="layer-btn px-4 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-slate-200 transition whitespace-nowrap">流日盤</button>
+            </div>
+
+            <div class="chart-grid w-full h-full max-w-[800px] mx-auto">
+                <!-- Palaces -->
+                <div class="palace-card area-si" id="p-5"><div class="branch-watermark">巳</div></div>
+                <div class="palace-card area-wu" id="p-6"><div class="branch-watermark">午</div></div>
+                <div class="palace-card area-wei" id="p-7"><div class="branch-watermark">未</div></div>
+                <div class="palace-card area-shen" id="p-8"><div class="branch-watermark">申</div></div>
+                
+                <div class="palace-card area-chen" id="p-4"><div class="branch-watermark">辰</div></div>
+                <div class="palace-card area-you" id="p-9"><div class="branch-watermark">酉</div></div>
+                
+                <div class="palace-card area-mao" id="p-3"><div class="branch-watermark">卯</div></div>
+                <div class="palace-card area-xu" id="p-10"><div class="branch-watermark">戌</div></div>
+                
+                <div class="palace-card area-yin" id="p-2"><div class="branch-watermark">寅</div></div>
+                <div class="palace-card area-chou" id="p-1"><div class="branch-watermark">丑</div></div>
+                <div class="palace-card area-zi" id="p-0"><div class="branch-watermark">子</div></div>
+                <div class="palace-card area-hai" id="p-11"><div class="branch-watermark">亥</div></div>
+
+                <!-- Center Info -->
+                <div class="area-center flex flex-col items-center justify-center text-center p-6">
+                    <div id="c-lunar" class="text-xl font-serif text-slate-200 mb-2">農曆日期</div>
+                    <div class="flex gap-4 text-sm text-slate-400 mb-4">
+                        <span id="c-bureau" class="px-2 py-1 bg-surface rounded border border-slate-700">五行局</span>
+                        <span id="c-year" class="px-2 py-1 bg-surface rounded border border-slate-700 text-purple-400">流年</span>
+                    </div>
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/20 mb-4">
+                        <span class="text-2xl">✨</span>
+                    </div>
+                    <p class="text-xs text-slate-500 max-w-[200px]">命盤乃先天之本，運勢乃後天之用。知命掌運，方能決勝千里。</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Market Chart Section -->
+    <div class="max-w-7xl mx-auto p-4 lg:p-8 mt-4">
+        <div class="bg-surface rounded-2xl p-6 shadow-xl border border-slate-700">
+            <h2 class="text-xl font-serif font-bold text-slate-200 mb-4 flex items-center">
+                <span class="w-1 h-6 bg-gold rounded mr-2"></span> 市場趨勢與運勢對照
+                <span id="user-context" class="ml-4 text-xs font-normal text-slate-400 border border-slate-600 rounded px-2 py-1">等待輸入生辰...</span>
+            </h2>
+            <div id="chart-container" class="w-full h-[500px] relative rounded-lg overflow-hidden border border-slate-600">
+                <!-- Overlay Info -->
+                <div id="chart-overlay" class="absolute top-2 left-2 z-10 bg-midnight/90 backdrop-blur border border-slate-600 rounded p-3 text-xs pointer-events-none min-w-[200px] shadow-lg">
+                    <div class="font-bold text-slate-200 mb-1" id="ov-date">--</div>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-400">
+                        <div>O: <span id="ov-open" class="text-slate-200">--</span></div>
+                        <div>H: <span id="ov-high" class="text-slate-200">--</span></div>
+                        <div>L: <span id="ov-low" class="text-slate-200">--</span></div>
+                        <div>C: <span id="ov-close" class="text-slate-200">--</span></div>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-slate-700 space-y-1">
+                        <div class="flex justify-between"><span>流年:</span> <span id="ov-year-lu" class="text-gold font-bold">--</span></div>
+                        <div class="flex justify-between"><span>流日:</span> <span id="ov-daily-lu" class="text-green-400 font-bold">--</span></div>
+                        <div class="text-slate-500 italic mt-1" id="ov-advice">--</div>
+                    </div>
+                </div>
+            </div>
+    </div>
+
+
+    <!-- Glossary Modal -->
+    <div id="glossary-modal" class="fixed inset-0 bg-midnight/90 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-opacity duration-300">
+        <div class="bg-surface w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl border border-slate-700 flex flex-col overflow-hidden animate-fade-in-up">
+            <!-- Header -->
+            <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
+                <h2 class="text-xl font-serif font-bold text-gold flex items-center">
+                    <span class="mr-2 text-2xl">🔮</span> 命理辭典
+                </h2>
+                <button onclick="toggleGlossary()" class="text-slate-400 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="flex border-b border-slate-700 bg-slate-800/30">
+                <button onclick="switchTab('guide')" id="tab-guide" class="flex-1 py-3 text-center text-sm font-semibold text-slate-400 hover:text-slate-200 transition">閱讀指南</button>
+                <button onclick="switchTab('stars')" id="tab-stars" class="flex-1 py-3 text-center text-sm font-semibold text-purple-400 border-b-2 border-purple-500 bg-slate-700/30 transition">十四主星</button>
+                <button onclick="switchTab('palaces')" id="tab-palaces" class="flex-1 py-3 text-center text-sm font-semibold text-slate-400 hover:text-slate-200 transition">十二宮位</button>
+                <button onclick="switchTab('trans')" id="tab-trans" class="flex-1 py-3 text-center text-sm font-semibold text-slate-400 hover:text-slate-200 transition">四化運勢</button>
+            </div>
+
+            <!-- Content Area -->
+            <div id="glossary-content" class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                <!-- Dynamic Content Here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Palace Definitions for Tooltip
+        const PALACE_DEFINITIONS = {
+            "命宮": "【核心運勢】 代表個性、天賦與整體運勢的基礎。決定一生的格局高低與財富潛力，投資風格深受此宮主星強烈影響。",
+            "兄弟": "【現金/周轉】 在投資上可視為「現金庫」或私人借貸關係。也代表與你合作夥伴的運勢，以及應急資金的調度能力。",
+            "夫妻": "【變現能力】 為官祿之遷移，代表投資獲利後的變現順利度，或是市場情緒對你的影響。有時也看另一半對財務的干預。",
+            "子女": "【合夥/桃花】 代表合夥投資運，也與消費娛樂、寵物、教育相關產業有關。暗示晚輩緣分及下屬的助力。",
+            "財帛": "【資金運用】 判斷財運強弱、賺錢模式與資金控管能力的核心宮位。看的是正財、現金流與理財手腕。",
+            "疾厄": "【身心狀態】 投資時的心理素質與抗壓性。也代表實體辦公場所或潛藏的危機（如過度疲勞導致的錯誤決策）。",
+            "遷移": "【外部環境】 出外發展的機遇，代表國際市場、外匯或外部消息面的影響。看你面對群眾與社會大舞台的展現。",
+            "交友": "【市場人氣】 (奴僕宮) 代表散戶指標或市場消息來源的可信度。大眾市場的反應，或是跟單、聽信明牌的吉凶。",
+            "官祿": "【事業經營】 代表正職收入的穩定度，影響你可投入投資的本金規模。看的是事業企圖心、工作能力與升遷機遇。",
+            "田宅": "【資產庫存】 代表不動產或長期持有的股票庫存，是財富累積的總倉庫。看家運、長期資產保值能力與被動收入。",
+            "福德": "【投資心態】 影響偏財運、直覺與承擔風險的心理素質。隱藏的財庫，也是你享受財富、花錢享樂的能力。",
+            "父母": "【監管/文書】 代表與銀行、政府機關的關係，或合約文書運。長輩貴人與法規變化對你投資佈局的影響。"
+        };
+
+
+        // --- Glossary Data ---
+        const GLOSSARY_DATA = {
+            stars: [
+                { name: "紫微", desc: "【帝王之星】", detail: "北斗主星。代表領導統御、尊貴、權力與面子。具有化解困難的能力，但容易孤傲。", invest: "適合**大型權值股、龍頭企業**、國營或政府相關產業。投資風格重視資產配置與長線價值，不喜投機短線操作。" },
+                { name: "天機", desc: "【智慧之星】", detail: "南斗主星。代表機智變動、分析、計算、宗教與邏輯思維。心思細膩轉數快，但容易精神緊繃。", invest: "適合**軟體、AI、科技股**或短線靈活操作。善於利用技術分析獲利，但也容易因想太多而錯失大波段。" },
+                { name: "太陽", desc: "【官祿之主】", detail: "中天主星。代表博愛光明、名聲、對外擴展與男性長輩。熱心公益，重視形象大於實質利益。", invest: "適合**能源、公用事業、大眾傳播、教育**。重視品牌知名度與企業社會形象，適合投資具有社會影響力的標的。" },
+                { name: "武曲", desc: "【正財之星】", detail: "北斗將星。代表剛毅果決、執行力與財富。實事求是，行動力極強，是斗數中最大的財星。", invest: "適合**金融保險、重工機械、金屬硬體**。對數字高度敏感，講求現金流與實質獲利，投資決斷力強不拖泥帶水。" },
+                { name: "天同", desc: "【福德之星】", detail: "南斗主星。代表溫和安逸、協調、享受與福氣。隨遇而安，有逢凶化吉的特質，但不喜競爭。", invest: "適合**休閒娛樂、餐飲、旅遊、服務業**。偏好穩健、低風險的投資標的（如定存股、高股息ETF），投資講求心安理得。" },
+                { name: "廉貞", desc: "【權威之星】", detail: "北斗主星。代表精密嚴謹、外交、桃花與次桃花。性格狂傲不羈，但也心思縝密，具有高度的專業素養。", invest: "適合**精密儀器、電子零組件、時尚設計、生技**。投資風格大膽且細膩，重視技術門檻高的專業領域。" },
+                { name: "天府", desc: "【庫藏之星】", detail: "南斗主星。代表守成穩健、包容、富足與房產。擅長管理，是天生的財務部長，只進不出。", invest: "適合**房地產、銀行金控、保險、傳產**。最適合長期持有與存股，極度重視資產保值與穩定利息收益，抗風險能力強。" },
+                { name: "太陰", desc: "【田宅之主】", detail: "中天主星。代表溫柔細膩、財富、積累與女性長輩。財富是靠長期慢慢累積而來，非一夜暴富。", invest: "適合**房地產（收租）、旅遊、女性消費品、飯店業**。善於積少成多，偏好穩定收租或長線慢慢增值的標的。" },
+                { name: "貪狼", desc: "【慾望之星】", detail: "北斗主星。代表多才多藝、投機、交際、桃花與大慾望。爆發力極強，但也容易因為貪念而大起大落。", invest: "適合**娛樂傳媒、博弈、加密貨幣、酒商**。偏財運旺盛，敢於冒險博取極高報酬，投資風格偏向高風險高回報。" },
+                { name: "巨門", desc: "【暗曜之星】", detail: "北斗主星。代表口才辯論、深層研究、是非與阻礙。洞察力極強，適合抽絲剝繭找尋被隱藏的真相。", invest: "適合**學術研究、法律顧問、生技製藥、冷門產業**。需深入研究基本面，適合發掘被低估的冷門股，避開消息面混雜的標的。" },
+                { name: "天相", desc: "【印鑑之星】", detail: "南斗主星。代表輔佐協調、形象、文書與合約。重視外表與信用，為人公正，但較缺乏開創力。", invest: "適合**仲介代理、服務業、形象管理、加盟體系**。偏好跟隨大趨勢或依附強者（如買大盤ETF），高度重視合約與制度保障。" },
+                { name: "天梁", desc: "【蔭庇之星】", detail: "南斗主星。代表清高正直、解厄、長者與傳統。遇難呈祥，但前提是必定先遇到困難才能化解。", invest: "適合**醫療照護、中醫藥、保險、長照公益**。投資風格極度保守，適合在空頭市場中表現突出的防禦型類股。" },
+                { name: "七殺", desc: "【將軍之星】", detail: "南斗將星。代表剛烈衝勁、開創、肅殺與孤軍奮戰。獨立作戰能力強，不畏艱難，爆發力十足。", invest: "適合**新創公司、重工原物料、航運、軍工**。極具爆發力，適合在趨勢明確時進行大波段操作，買賣果決敢愛敢恨。" },
+                { name: "破軍", desc: "【耗損之星】", detail: "北斗主星。代表破舊立新、變動、先破後立。凡事必先大幅破壞原本的狀態，才能重新建立新的局面。", invest: "適合**轉型中的企業、破壞式創新、併購重組**。財運大起大落，最適合尋找股價被嚴重低估或正在內部重整的轉機股。" }
+            ],
+            palaces: Object.keys(PALACE_DEFINITIONS).map(key => ({
+                name: key,
+                desc: "", // Can add simple desc here if needed
+                detail: PALACE_DEFINITIONS[key].split('】 ')[1] || PALACE_DEFINITIONS[key],
+                badge: PALACE_DEFINITIONS[key].split('】 ')[0] + '】'
+            })),
+            trans: [
+                { name: "化祿", desc: "【財源/機遇】", detail: "象徵資金流入、機會爆發、順利與福氣。祿代表『春天』，萬物生長，是豐收的起點。", invest: "多方訊號。資金充沛，獲利機會極大，適合積極進場佈局、加碼投資。若逢吉星更是錦上添花。" },
+                { name: "化權", desc: "【權力/掌控】", detail: "象徵競爭力、主導權、行動力增強與擴張。權代表『夏天』，熾熱且具侵略性，必須努力爭取。", invest: "強勢訊號。股價波動劇烈，適合擴大槓桿操作、搶進強勢龍頭股。決斷要快，不宜猶豫。" },
+                { name: "化科", desc: "【名聲/科名】", detail: "象徵知名度、貴人相助、平穩發展與解厄。科代表『秋天』，收成平穩，注重聲譽與安全感。", invest: "穩定訊號。適合投資知名品牌、具有長年配息紀錄的穩健成長股，獲利猶如細水長流。" },
+                { name: "化忌", desc: "【阻礙/虧損】", detail: "象徵波折、是非、虧損、黏著與考驗。忌代表『冬天』，萬物蟄伏，動輒得咎，必須保守。", invest: "空方大凶訊號。資金極易卡住或面臨巨大虧損風險，強烈建議避險觀望、現金為王，或進行反向放空操作。" }
+            ]
+        };
+
+        // --- UI Logic ---
+        function toggleGlossary() {
+            const modal = document.getElementById('glossary-modal');
+            const content = document.getElementById('glossary-content');
+            
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                // Render default tab
+                switchTab('guide');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function switchTab(tab) {
+            const container = document.getElementById('glossary-content');
+            container.innerHTML = '';
+            
+            // Reset Tab Styles
+            ['guide', 'stars', 'palaces', 'trans'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                if(t === tab) {
+                    btn.classList.add('text-purple-400', 'border-b-2', 'border-purple-500', 'bg-slate-700/30');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    btn.classList.remove('text-purple-400', 'border-b-2', 'border-purple-500', 'bg-slate-700/30');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+
+            // Render Content
+            const items = GLOSSARY_DATA[tab];
+            
+            if (tab === 'guide') {
+                container.innerHTML = `
+                    <div class="space-y-6 text-slate-300">
+                        <div class="bg-slate-800/50 p-5 rounded-xl border border-slate-700">
+                            <h4 class="text-lg font-bold text-purple-400 mb-3"><span class="mr-2">📚</span>一、 紫微斗數閱讀流程 (三步法)</h4>
+                            <ol class="list-decimal pl-5 space-y-3">
+                                <li><strong class="text-gold">看本命 (格局與天賦)：</strong> 首先鎖定「命宮」，觀察其中的主星（如紫微、天機等），這決定了你的基本性格、天賦潛力以及投資與做事的基礎風格。</li>
+                                <li><strong class="text-gold">看強弱 (資源與環境)：</strong> 接著查看與你最相關的「財帛宮」（資金運用）、「官祿宮」（事業正財）以及「遷移宮」（外部環境機遇）。這被稱為「三方四正」，能評估你當下的整體運勢與可用資源。</li>
+                                <li><strong class="text-gold">看變化 (運勢與時機)：</strong> 最後找出盤面上的「四化星」（化祿、化權、化科、化忌）。四化是引動運勢變化的開關：跟著「化祿」找機會，避開「化忌」防風險。</li>
+                            </ol>
+                        </div>
+
+                        <div class="bg-slate-800/50 p-5 rounded-xl border border-slate-700">
+                            <h4 class="text-lg font-bold text-blue-400 mb-3"><span class="mr-2">🗺️</span>二、 當命盤出現後，要怎麼解讀？</h4>
+                            <ul class="list-disc pl-5 space-y-3">
+                                <li><strong class="text-blue-300">認識12宮位：</strong> 命盤顯示的12個格子代表12個生活面向（如財帛、夫妻、田宅等）。將滑鼠懸停在宮位上，會顯示該宮位的白話解釋。</li>
+                                <li><strong class="text-blue-300">辨識星曜能量：</strong> 每個格子裡有不同的「星曜」。大字體的是主星（如太陽、太陰），代表該宮位的主要特徵；小字體的是輔星，提供細節修飾。</li>
+                                <li><strong class="text-blue-300">投資理財應用：</strong> 結合本系統的財經模型，特別留意「財帛宮」、「田宅宮」（資產）與「福德宮」（心態）。若你的財帛宮有「武曲」或「化祿」，代表近期資金動能強勁。</li>
+                                <li><strong class="text-blue-300">動態時間軸：</strong> 命盤不僅是靜態的，還會隨時間轉動（分為大運、流年）。透過系統切換當前年份，關注運勢變化，及時調整投資策略。</li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-slate-800/50 p-5 rounded-xl border border-slate-700">
+                            <h4 class="text-lg font-bold text-green-400 mb-3"><span class="mr-2">⏱️</span>三、 命盤轉動與時間軸規則 (流運)</h4>
+                            <p class="text-sm text-slate-400 mb-3 leading-relaxed">紫微斗數不僅能看一生格局，還能像時鐘一樣轉動，對應到不同時間點的運勢，這就是所謂的「流運」。本系統已經將這複雜的數學模型實作完成，直接幫您換算農曆並定點。</p>
+                            <ul class="list-disc pl-5 space-y-3">
+                                <li><strong class="text-green-300">大運 (十年一變)：</strong> 每十年，你的「命宮」會移到下一個格子（順時針或逆時針）。這代表你這十年的主要生活重心與大環境。例如，大運走到「財帛宮」，這十年你會特別專注於賺錢與資金操作。</li>
+                                <li><strong class="text-green-300">流年 (一年一變)：</strong> 根據當年的生肖（地支），流年命宮會落在對應的格子裡（例如：蛇年流年命宮在「巳」）。這決定了你今年總體的吉凶禍福。此時，盤面上會飛入今年的「流年四化（祿權科忌）」，這是當年最大的變數。</li>
+                                <li><strong class="text-green-300">流月與流日：</strong> 系統會透過複雜的飛星軌跡定位當月與當日的運勢落點。用來決定短期決策（例如：近期股票進場、簽署合約）。</li>
+                                <li><strong class="text-gold">疊加效應 (重要)：</strong> 這是看盤的最高技巧。當你的「本命」星曜（靜態）與「流運」四化（動態）產生化學反應時，事件就會爆發。例如：本命武曲星（財星），在流月剛好碰上「化祿」，代表當月進財機會極大！請將滑鼠移到盤面上有標示「(流日/流月)」的宮位上，查看當下的特殊運勢指引。</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            } else if(tab === 'stars') {
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+                
+                items.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-800/50 p-4 rounded-xl border border-slate-700 hover:border-purple-500/50 transition';
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-lg font-bold text-gold">${item.name} <span class="text-xs font-normal text-slate-400 ml-1">${item.desc}</span></h3>
+                        </div>
+                        <p class="text-sm text-slate-300 mb-2">${item.detail}</p>
+                        <div class="text-xs bg-purple-900/20 text-purple-300 p-2 rounded border border-purple-500/20">
+                            <span class="font-bold">🎯 投資應用：</span>${item.invest}
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+                container.appendChild(grid);
+            } else if (tab === 'palaces') {
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+                
+                items.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-800/50 p-4 rounded-xl border border-slate-700 hover:border-blue-500/50 transition';
+                    card.innerHTML = `
+                        <h3 class="text-lg font-bold text-blue-300 mb-1">${item.name}</h3>
+                        <div class="text-xs font-bold text-blue-500 mb-2">${item.badge}</div>
+                        <p class="text-sm text-slate-300 leading-relaxed">${item.detail}</p>
+                    `;
+                    grid.appendChild(card);
+                });
+                container.appendChild(grid);
+            } else if (tab === 'trans') {
+                const list = document.createElement('div');
+                list.className = 'space-y-4';
+                
+                items.forEach(item => {
+                    let color = 'slate';
+                    if(item.name === '化祿') color = 'gold';
+                    if(item.name === '化權') color = 'purple';
+                    if(item.name === '化科') color = 'blue';
+                    if(item.name === '化忌') color = 'red';
+                    
+                    const card = document.createElement('div');
+                    card.className = `bg-slate-800/50 p-4 rounded-xl border border-${color === 'gold' ? 'yellow' : color}-500/30 flex gap-4 items-start`;
+                    
+                    // Color mapping for text
+                    let textColor = `text-${color}-400`;
+                    if(color === 'gold') textColor = 'text-yellow-400';
+                    if(color === 'purple') textColor = 'text-purple-400';
+                    if(color === 'blue') textColor = 'text-blue-400';
+                    if(color === 'red') textColor = 'text-red-400';
+
+                    card.innerHTML = `
+                        <div class="text-2xl font-bold ${textColor} w-16 text-center pt-1 border-r border-slate-700 pr-4">${item.name}</div>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-slate-200 mb-1">${item.desc}</h4>
+                            <p class="text-sm text-slate-400 mb-2">${item.detail}</p>
+                            <p class="text-sm text-slate-300"><span class="font-bold text-slate-500">📈 影響：</span>${item.invest}</p>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+                container.appendChild(list);
+            }
+        }
+
+
+        // --- Enhance Palace UI on Load ---
+        const BRANCH_INFO = {
+            "子": { time: "23:00-01:00", dir: "正北", label: "子" },
+            "丑": { time: "01:00-03:00", dir: "東北偏北", label: "丑" },
+            "寅": { time: "03:00-05:00", dir: "東北偏東", label: "寅" },
+            "卯": { time: "05:00-07:00", dir: "正東", label: "卯" },
+            "辰": { time: "07:00-09:00", dir: "東南偏東", label: "辰" },
+            "巳": { time: "09:00-11:00", dir: "東南偏南", label: "巳" },
+            "午": { time: "11:00-13:00", dir: "正南", label: "午" },
+            "未": { time: "13:00-15:00", dir: "西南偏南", label: "未" },
+            "申": { time: "15:00-17:00", dir: "西南偏西", label: "申" },
+            "酉": { time: "17:00-19:00", dir: "正西", label: "酉" },
+            "戌": { time: "19:00-21:00", dir: "西北偏西", label: "戌" },
+            "亥": { time: "21:00-23:00", dir: "西北偏北", label: "亥" }
+        };
+
+        // Init UI: Add Branch Labels
+        document.querySelectorAll('.palace-card').forEach(p => {
+            const wm = p.querySelector('.branch-watermark');
+            if(wm) {
+                const b = wm.innerText.trim();
+                const info = BRANCH_INFO[b];
+                
+                // Add Branch Label (Top Left)
+                const label = document.createElement('div');
+                label.className = 'branch-label';
+                label.innerText = `${b} (${info.time})`;
+                label.title = `方位: ${info.dir}`;
+                p.appendChild(label);
+                
+                // Center watermark
+                // CSS class .branch-watermark already centers it via transform
+            }
+        });
+
+        // Init Day Select
+        const daySelect = document.getElementById('day');
+        // Initialize current date
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        document.getElementById('targetDate').value = `${yyyy}-${mm}-${dd}`;
+
+        for(let i=1; i<=31; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.text = i;
+            if(i===15) opt.selected = true;
+            daySelect.appendChild(opt);
+        }
+
+        let currentChartData = [];
+        let currentLayer = 'natal';
+
+        function switchChartLayer(layer) {
+            currentLayer = layer;
+            
+            // Update button styles
+            document.querySelectorAll('.layer-btn').forEach(btn => {
+                btn.className = "layer-btn px-4 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-slate-200 transition whitespace-nowrap";
+            });
+            const activeBtn = document.getElementById(`layer-btn-${layer}`);
+            if (activeBtn) {
+                activeBtn.className = "layer-btn px-4 py-2 rounded-lg text-sm font-bold bg-purple-600 text-white border border-purple-500 shadow-lg shadow-purple-500/30 transition whitespace-nowrap";
+            }
+
+            // Re-render chart if data exists
+            if (currentChartData && currentChartData.length > 0) {
+                renderChartLayer(layer);
+            }
+        }
+
+        function renderChartLayer(layer) {
+            currentChartData.forEach(palaceData => {
+                const el = document.getElementById(`p-${palaceData.index}`);
+                if (!el) return;
+
+                // Clear children except watermark
+                Array.from(el.children).forEach(child => {
+                    if (!child.classList.contains('branch-watermark')) {
+                        el.removeChild(child);
+                    }
+                });
+
+                // Get Layer Data
+                const layerInfo = palaceData.layers[layer];
+                if (!layerInfo) return;
+
+                const functionName = layerInfo.name || "";
+                const stars = layerInfo.stars || [];
+
+                // Re-append Function Name
+                const fnDiv = document.createElement('div');
+                fnDiv.className = 'branch-label';
+                fnDiv.innerText = functionName;
+                el.appendChild(fnDiv);
+
+                // Add Stars Container
+                const scDiv = document.createElement('div');
+                scDiv.className = 'flex flex-col gap-1 w-full text-right mt-1 z-10 flex-1';
+                
+                stars.forEach(starStr => {
+                    const sDiv = document.createElement('div');
+                    sDiv.className = 'text-sm font-bold truncate';
+                    
+                    let color = 'text-slate-300';
+                    if(starStr.includes('紫微') || starStr.includes('天府') || starStr.includes('太陽')) color = 'text-gold';
+                    else if(starStr.includes('武曲') || starStr.includes('太陰') || starStr.includes('祿')) color = 'text-green-400';
+                    else if(starStr.includes('七殺') || starStr.includes('破軍') || starStr.includes('貪狼')) color = 'text-red-400';
+                    else if(starStr.includes('忌')) color = 'text-red-500 bg-red-900/20';
+                    else if(starStr.includes('祿')) color = 'text-gold bg-yellow-900/20';
+                    
+                    if (starStr.includes('祿')) {
+                        starStr = starStr.replace('祿', '<span class="text-gold">祿</span>');
+                    }
+                    if (starStr.includes('忌')) {
+                        starStr = starStr.replace('忌', '<span class="text-red-500">忌</span>');
+                    }
+
+                    sDiv.innerHTML = `<span class="${color}">${starStr}</span>`;
+                    scDiv.appendChild(sDiv);
+                });
+                el.appendChild(scDiv);
+
+                // Setup tooltips (reuse data but with layered tooltip stars)
+                // For simplicity, tooltip will continue to use palaceData but with specific layer mapping if needed.
+                // It's already attached via event listener if we replace content, wait, replaceChild removed listener!
+                // Let's NOT replace clone node here, just clear innerHTML and re-attach or rely on delegation.
+                // Wait! In original code, the listener was attached during `fetch`. Let's move listener attachment here.
+                
+                // Remove old event listeners by cloning
+                const newEl = el.cloneNode(true);
+                el.parentNode.replaceChild(newEl, el);
+
+                newEl.addEventListener('mouseenter', (e) => {
+                    const tooltip = document.getElementById('palace-tooltip');
+                    const tipTitle = document.getElementById('tip-title');
+                    const tipTrans = document.getElementById('tip-trans-influence');
+                    const tipStars = document.getElementById('tip-stars-influence');
+                    const tipFlow = document.getElementById('tip-flow-summary');
+                    const tipDo = document.getElementById('tip-do');
+                    const tipDont = document.getElementById('tip-dont');
+
+                    tipFlow.innerHTML = ''; tipFlow.classList.add('hidden');
+                    tipTrans.innerHTML = ''; tipTrans.classList.add('hidden');
+                    tipStars.innerHTML = ''; tipStars.classList.add('hidden');
+                    tipDo.innerHTML = ''; tipDont.innerHTML = '';
+
+                    // Flow summaries
+                    if (palaceData.flowSummaries && palaceData.flowSummaries.length > 0) {
+                        tipFlow.innerHTML = palaceData.flowSummaries.join('<br><br>');
+                        tipFlow.classList.remove('hidden');
+                    }
+                    
+                    // Advice
+                    if (palaceData.advice) {
+                        if (palaceData.advice.do.length > 0) {
+                            palaceData.advice.do.forEach(item => {
+                                const li = document.createElement('li');
+                                li.innerHTML = `<span class="text-green-500 mr-1">✓</span> ${item}`;
+                                tipDo.appendChild(li);
+                            });
+                        } else {
+                            tipDo.innerHTML = '<li class="text-slate-500 italic">無特別建議</li>';
+                        }
+                        
+                        if (palaceData.advice.dont.length > 0) {
+                            palaceData.advice.dont.forEach(item => {
+                                const li = document.createElement('li');
+                                li.innerHTML = `<span class="text-red-500 mr-1">✕</span> ${item}`;
+                                tipDont.appendChild(li);
+                            });
+                        } else {
+                            tipDont.innerHTML = '<li class="text-slate-500 italic">無特別禁忌</li>';
+                        }
+                    }
+
+                    // Stars Influence (Use Layer Stars)
+                    let starsHtml = '';
+                    let transHtml = '';
+
+                    stars.forEach(starStr => {
+                        const starName = starStr.split(' ')[0];
+                        const starData = GLOSSARY_DATA.stars.find(s => s.name === starName);
+                        if (starData) {
+                            starsHtml += `<div class="mb-1"><span class="text-blue-300 font-bold">${starData.name}</span> ${starData.desc}<br><span class="text-xs text-slate-400 opacity-80">${starData.detail}</span></div>`;
+                        }
+
+                        const transMatches = starStr.match(/\((.*?)\)/g);
+                        if (transMatches) {
+                            transMatches.forEach(match => {
+                                const transTag = match.replace(/[<>\/a-z=" \-]/gi, '').replace(/[()]/g, '');
+                                if(transTag.length >= 2) {
+                                    const timeScope = transTag.charAt(0);
+                                    const transType = transTag.charAt(1);
+                                    let scopeDesc = timeScope === '年' ? '流年' : timeScope === '月' ? '流月' : timeScope === '運' ? '大運' : timeScope === '日' ? '流日' : '先天';
+                                    let typeData = GLOSSARY_DATA.trans.find(t => t.name.includes(transType));
+                                    if (typeData) {
+                                        transHtml += `<div class="mb-1"><span class="text-yellow-400 font-bold">${scopeDesc}化${transType}</span>：<span class="text-slate-300 text-xs">${typeData.detail}</span><div class="text-[10px] text-green-300/80 mt-0.5">${typeData.invest}</div></div>`;
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    if (starsHtml) {
+                        tipStars.innerHTML = `<div class="font-bold text-slate-500 text-[10px] mb-1">主星影響</div>${starsHtml}`;
+                        tipStars.classList.remove('hidden');
+                    }
+                    if (transHtml) {
+                        tipTrans.innerHTML = `<div class="font-bold text-yellow-500 text-[10px] mb-1">⚡ 飛星四化引動</div>${transHtml}`;
+                        tipTrans.classList.remove('hidden');
+                    }
+
+                    tooltip.classList.remove('hidden');
+
+                    const baseName = functionName ? functionName.split(' ')[0] : '宮位';
+                    const definition = PALACE_DEFINITIONS[baseName] || "";
+                    
+                    tipTitle.innerHTML = `<span class="text-lg">${functionName || '宮位說明'}</span>`;
+                    if(definition) {
+                        tipTitle.innerHTML += `<div class="text-xs text-slate-400 font-normal mt-1 pt-1 border-t border-slate-600/50 leading-relaxed">${definition}</div>`;
+                    }
+                    
+                    const branch = el.querySelector('.branch-watermark').innerText;
+                    const branchInfo = typeof BRANCH_INFO !== 'undefined' ? BRANCH_INFO[branch] : null;
+                    if(branchInfo) {
+                        tipTitle.innerHTML = `<span class="text-xs text-slate-500 mr-2">${branchInfo.dir} (${branchInfo.time})</span><br>` + tipTitle.innerHTML;
+                    }
+
+                    const rect = newEl.getBoundingClientRect();
+                    let left = rect.right + 10;
+                    let top = rect.top;
+                    if(left + 300 > window.innerWidth) left = rect.left - 310;
+                    if(top + 300 > window.innerHeight) top = window.innerHeight - 300;
+                    tooltip.style.left = left + 'px';
+                    tooltip.style.top = top + 'px';
+                });
+
+                newEl.addEventListener('mouseleave', () => {
+                    document.getElementById('palace-tooltip').classList.add('hidden');
+                });
+
+                // Add Palace Name Badge at bottom
+                if(functionName) {
+                    const nDiv = document.createElement('div');
+                    nDiv.className = 'palace-badge flex flex-col items-end absolute bottom-2 right-2';
+                    
+                    const baseName = functionName.split(' ')[0];
+                    const def = PALACE_DEFINITIONS[baseName];
+                    const shortDesc = def ? (def.match(/【(.*?)】/) || ['', ''])[1] : '';
+
+                    nDiv.innerHTML = `
+                        <span class="text-sm font-bold text-slate-200 bg-slate-800/80 px-1 rounded">${functionName}</span>
+                        ${shortDesc ? `<span class="text-[10px] text-slate-400 font-normal tracking-wide">${shortDesc}</span>` : ''}
+                    `;
+                    newEl.appendChild(nDiv);
+                }
+
+                // Apply dynamic layer styling
+                newEl.style.borderTop = '';
+                newEl.style.borderBottom = '';
+                if (layer === 'annual' && palaceData.isAnnualLife) newEl.style.borderTop = '3px solid #F59E0B';
+                if (layer === 'decade' && palaceData.isDecadeLife) newEl.style.borderTop = '3px solid #8B5CF6';
+                if (layer === 'monthly' && palaceData.isMonthlyLife) newEl.style.borderBottom = '3px solid #38BDF8';
+                if (layer === 'daily' && palaceData.isDailyLife) {
+                    const dDot = document.createElement('div');
+                    dDot.className = 'absolute top-2 left-2 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse';
+                    dDot.title = '流日命宮';
+                    newEl.appendChild(dDot);
+                }
+            });
+        }
+
+        document.getElementById('calcForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            document.getElementById('loading').classList.remove('hidden'); // Show loading
+
+            const year = document.getElementById('year').value;
+            const targetDate = document.getElementById('targetDate').value;
+            const month = document.getElementById('month').value;
+            const day = document.getElementById('day').value;
+            const hour = document.getElementById('hour').value;
+
+            // Clear previous UI
+            document.querySelectorAll('.palace-card').forEach(p => {
+                const wm = p.querySelector('.branch-watermark');
+                // Remove all children except watermark and label
+                Array.from(p.children).forEach(child => {
+                    if(!child.classList.contains('branch-watermark') && !child.classList.contains('branch-label')) {
+                        p.removeChild(child);
+                    }
+                });
+                
+                // Reset styles
+                p.className = 'palace-card ' + p.className.split(' ').filter(c => c.startsWith('area-')).join(' ');  
+                p.style.borderTop = '';
+                p.style.borderBottom = '';
+                
+                // Remove existing event listeners (by cloning node or just assuming overwrites won't duplicate tooltip logic if we handle properly)
+                // To be safe, we re-create listeners each time or check if already added.
+                // Simple way: The 'palaceData' loop will attach new listeners, but we should be careful about duplicates.
+                // Actually, replacing element with cloneNode(true) removes listeners.
+                const newEl = p.cloneNode(true);
+                p.parentNode.replaceChild(newEl, p);
+            });
+            document.getElementById('strategyBox').classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/calculate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ year, month, day, hour, targetDate })
+                });
+                const data = await res.json();
+                
+                // --- Update User Context Label in Chart ---
+                document.getElementById('user-context').innerText = `已載入 ${year}/${month}/${day} 出生者於 ${targetDate} 之運勢`;
+                document.getElementById('user-context').className = "ml-4 text-xs font-normal text-green-400 border border-green-700 bg-green-900/30 rounded px-2 py-1 transition-all";
+
+                // --- Render Metadata ---
+                document.getElementById('c-lunar').innerText = `本命: ${data.meta.lunarDate} | 流運: ${data.meta.targetLunarDate}`;
+                document.getElementById('c-bureau').innerText = `${data.meta.bureau}局`;
+                document.getElementById('c-year').innerText = `${data.meta.targetYear} ${data.meta.targetYearStem}`;
+
+                // --- Render Chart ---
+                currentChartData = data.chart;
+                switchChartLayer(currentLayer);
+
+                // --- Render Strategy ---
+                const sBox = document.getElementById('strategyBox');
+                sBox.classList.remove('hidden');
+                
+                const actionSpan = document.getElementById('s-action');
+                actionSpan.innerText = data.strategy.action;
+                
+                const riskBadge = document.getElementById('s-risk-badge');
+                riskBadge.innerText = `風險等級: ${data.strategy.riskLevel}`;
+                if(data.strategy.riskLevel.includes('High')) {
+                    riskBadge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-900/50 text-red-200 border border-red-800';
+                    actionSpan.className = 'text-3xl font-serif font-bold text-red-400';
+                } else if(data.strategy.riskLevel.includes('Low')) {
+                    riskBadge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-green-900/50 text-green-200 border border-green-800';
+                    actionSpan.className = 'text-3xl font-serif font-bold text-green-400';
+                } else {
+                    riskBadge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-yellow-900/50 text-yellow-200 border border-yellow-800';
+                    actionSpan.className = 'text-3xl font-serif font-bold text-yellow-400';
+                }
+
+                const sectorsDiv = document.getElementById('s-sectors');
+                sectorsDiv.innerHTML = '';
+                data.strategy.sectors.forEach(sec => {
+                    const tag = document.createElement('span');
+                    tag.className = 'px-3 py-1 bg-surface border border-slate-600 rounded text-xs text-slate-300';
+                    tag.innerText = sec;
+                    sectorsDiv.appendChild(tag);
+                });
+
+                document.getElementById('s-analysis').innerHTML = data.strategy.analysis || '暫無詳細分析';
+
+                // ==========================
+                // Trigger Backtest
+                // ==========================
+                runBacktestAPI(year, month, day, hour);
+
+            } catch (err) {
+                console.error(err);
+                alert('API Error: 請檢查連線或稍後再試');
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        });
+
+        // ----------------------------------------------------
+        // Chart Initialization
+        // ----------------------------------------------------
+        const chartContainer = document.getElementById('chart-container');
+        const chart = LightweightCharts.createChart(chartContainer, {
+            width: chartContainer.clientWidth,
+            height: 500,
+            layout: {
+                background: { color: '#0f172a' }, // Tailwind bg-slate-900
+                textColor: '#94a3b8',
+            },
+            grid: {
+                vertLines: { color: '#1e293b' },
+                horzLines: { color: '#1e293b' },
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            timeScale: {
+                borderColor: '#334155',
+            },
+            rightPriceScale: {
+                borderColor: '#334155',
+            },
+        });
+
+        const candlestickSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
+            upColor: '#ef4444', 
+            downColor: '#10b981',
+            borderUpColor: '#ef4444',
+            borderDownColor: '#10b981',
+            wickUpColor: '#ef4444',
+            wickDownColor: '#10b981',
+        });
+
+        fetch('/api/market-data')
+            .then(res => res.json())
+            .then(data => {
+                const mappedData = data.map(d => ({
+                    time: d.time,
+                    open: d.open,
+                    high: d.high,
+                    low: d.low,
+                    close: d.close
+                }));
+                
+                // Add future dates (whitespace) to allow scrolling into the future for predictions
+                if (mappedData.length > 0) {
+                    let lastDate = new Date(mappedData[mappedData.length - 1].time);
+                    for (let i = 1; i <= 30; i++) {
+                        let nextDate = new Date(lastDate);
+                        nextDate.setDate(lastDate.getDate() + i);
+                        // Skip weekends
+                        if (nextDate.getDay() === 0 || nextDate.getDay() === 6) continue;
+                        
+                        let ds = nextDate.toISOString().split('T')[0];
+                        mappedData.push({ time: ds }); // No price data, just time
+                    }
+                }
+                
+                candlestickSeries.setData(mappedData);
+            });
+
+        window.addEventListener('resize', () => {
+            chart.applyOptions({ width: chartContainer.clientWidth });
+        });
+
+        let currentTargetDate = "";
+        let fetchTimeout;
+        chart.subscribeCrosshairMove(param => {
+            const dateStr = param.time;
+            const overlay = document.getElementById('chart-overlay');
+            
+            if (!dateStr || !param.point || param.point.x < 0 || param.point.x > chartContainer.clientWidth || param.point.y < 0 || param.point.y > chartContainer.clientHeight) {
+                overlay.style.opacity = '0.5';
+                return;
+            }
+
+            const price = param.seriesData.get(candlestickSeries);
+            
+            overlay.style.opacity = '1';
+            document.getElementById('ov-date').innerText = dateStr;
+            if (price && price.open !== undefined) {
+                document.getElementById('ov-open').innerText = price.open.toFixed(2);
+                document.getElementById('ov-high').innerText = price.high.toFixed(2);
+                document.getElementById('ov-low').innerText = price.low.toFixed(2);
+                document.getElementById('ov-close').innerText = price.close.toFixed(2);
+            } else {
+                document.getElementById('ov-open').innerText = '--';
+                document.getElementById('ov-high').innerText = '--';
+                document.getElementById('ov-low').innerText = '--';
+                document.getElementById('ov-close').innerText = '--';
+            }
+            
+            // Fetch Ziwei Info for Overlay (Debounce recommended in production)
+                clearTimeout(fetchTimeout);
+                fetchTimeout = setTimeout(() => {
+                    const bYear = document.getElementById('year').value;
+                    const bMonth = document.getElementById('month').value;
+                    const bDay = document.getElementById('day').value;
+                    const bHour = document.getElementById('hour').value;
+                    
+                    fetch(`/api/daily-fortune?date=${dateStr}&birthYear=${bYear}&birthMonth=${bMonth}&birthDay=${bDay}&birthHour=${bHour}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            const user = data.user;
+                            const yLu = user.annual.lu;
+                            const yJi = user.annual.ji;
+                            const dLu = user.daily.lu;
+                            const dJi = user.daily.ji;
+
+                            // Basic Overlay Info
+                            document.getElementById('ov-year-lu').innerHTML = `<span class="text-gold">祿:${yLu}</span> <span class="text-gray-500">忌:${yJi}</span>`;
+                            document.getElementById('ov-daily-lu').innerHTML = `<span class="text-green-400">祿:${dLu}</span> <span class="text-gray-500">忌:${dJi}</span>`;
+                            
+                            // Detailed User Info
+                            let adviceHtml = `<div class="mt-2 text-xs border-t border-slate-700 pt-2">`;
+                            adviceHtml += `<div class="flex justify-between text-slate-300"><span>流日命宮(${user.daily.lifePosBranch}):</span> <span class="text-purple-300 truncate max-w-[100px] text-right">${user.daily.lifeStars.join(',')}</span></div>`;
+                            adviceHtml += `<div class="flex justify-between text-slate-300"><span>流日財帛(${user.daily.wealthPosBranch}):</span> <span class="text-gold truncate max-w-[100px] text-right">${user.daily.wealthStars.join(',')}</span></div>`;
+                            
+                            let scoreColor = 'text-slate-400';
+                            if(user.advice.score > 60) scoreColor = 'text-green-400';
+                            if(user.advice.score < 40) scoreColor = 'text-red-400';
+                            
+                            adviceHtml += `<div class="mt-1 font-bold ${scoreColor}">運勢評分: ${user.advice.score} (${user.advice.summary})</div>`;
+                            adviceHtml += `<div class="text-slate-500 italic mt-1 leading-tight break-words" style="font-size: 10px;">${user.advice.details}</div>`;
+                            adviceHtml += `</div>`;
+
+                            // Check if detail container exists, else append
+                            let detailDiv = document.getElementById('ov-detail');
+                            if(!detailDiv) {
+                                detailDiv = document.createElement('div');
+                                detailDiv.id = 'ov-detail';
+                                document.getElementById('chart-overlay').appendChild(detailDiv);
+                            }
+                            detailDiv.innerHTML = adviceHtml;
+
+                            // Old advice removal/update
+                            const oldAdvice = document.getElementById('ov-advice');
+                            if(oldAdvice) oldAdvice.style.display = 'none'; // Hide old simple advice
+                            
+                        })
+                        .catch(e => console.error(e));
+                }, 100); // 100ms debounce
+        });
+
+        // ==========================================
+        // Phase 2: Backtesting Integration
+        // ==========================================
+        function runBacktestAPI(year, month, day, hour) {
+            document.getElementById('backtest-box').classList.remove('hidden');
+            document.getElementById('bt-roi-badge').innerText = 'Calculating...';
+            document.getElementById('bt-roi-badge').className = 'px-3 py-1 rounded-full text-xs font-bold bg-slate-700 text-slate-300';
+            document.getElementById('bt-initial').innerText = '...';
+            document.getElementById('bt-final').innerText = '...';
+            document.getElementById('bt-trades-list').innerHTML = '<div class="text-slate-500 text-center py-4 flex flex-col items-center"><div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mb-2"></div>正在載入兩年大盤數據並進行回測...</div>';
+
+            fetch(`/api/backtest?birthYear=${year}&birthMonth=${month}&birthDay=${day}&birthHour=${hour}`)
+                .then(res => res.json())
+                .then(data => {
+                    const roiNum = parseFloat(data.roi);
+                    const isPositive = roiNum >= 0;
+                    
+                    document.getElementById('bt-initial').innerText = `$${data.initialCapital.toLocaleString()}`;
+                    document.getElementById('bt-final').innerText = `$${data.finalValue.toLocaleString()}`;
+                    
+                    const badgeClass = isPositive ? 'bg-green-900/50 text-green-400 border border-green-700' : 'bg-red-900/50 text-red-400 border border-red-700';
+                    document.getElementById('bt-roi-badge').innerText = `報酬率 (ROI): ${isPositive ? '+' : ''}${data.roi}%`;
+                    document.getElementById('bt-roi-badge').className = `px-3 py-1 rounded-full text-sm font-bold shadow-lg ${badgeClass}`;
+
+                    const tradesHtml = data.trades.map(t => {
+                        const actionColor = t.action.includes('BUY') ? 'text-green-400' : 'text-red-400';
+                        return `
+                            <div class="flex justify-between items-center py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800 transition px-2">
+                                <span class="text-xs text-slate-400 font-mono">${t.date}</span>
+                                <span class="text-xs font-bold ${actionColor}">${t.action} @ ${t.price}</span>
+                                <span class="text-xs text-slate-300 font-mono">Total: $${Math.round(t.portfolioValue).toLocaleString()}</span>
+                            </div>
+                        `;
+                    }).join('');
+
+                    document.getElementById('bt-trades-list').innerHTML = tradesHtml || '<div class="text-slate-500 text-center py-4">兩年內無任何符合條件的交易訊號 (流日財帛無明顯祿忌)</div>';
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('bt-trades-list').innerHTML = '<div class="text-red-500 text-center py-4">回測運算失敗或 API 限制</div>';
+                });
+        }
+    </script>
+</body>
+
+</html>

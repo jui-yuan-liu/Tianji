@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tianji 天機 - 專業排盤室 (宮位本位模式)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/app.js"></script>
+    <script src="/glossary.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .bg-surface { background-color: #1e293b; }
+        .bg-midnight { background-color: #0f172a; }
+        .text-gold { color: #f59e0b; }
+        
+        /* CSS Grid Mapping for Fixed Palaces (Clockwise) */
+        .chart-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 8px; }
+        .area-p1 { grid-area: 1 / 1; } /* 命宮 */
+        .area-p2 { grid-area: 1 / 2; } /* 兄弟 */
+        .area-p3 { grid-area: 1 / 3; } /* 夫妻 */
+        .area-p4 { grid-area: 1 / 4; } /* 子女 */
+        .area-p5 { grid-area: 2 / 4; } /* 財帛 */
+        .area-p6 { grid-area: 3 / 4; } /* 疾厄 */
+        .area-p7 { grid-area: 4 / 4; } /* 遷移 */
+        .area-p8 { grid-area: 4 / 3; } /* 交友 */
+        .area-p9 { grid-area: 4 / 2; } /* 官祿 */
+        .area-p10 { grid-area: 4 / 1; } /* 田宅 */
+        .area-p11 { grid-area: 3 / 1; } /* 福德 */
+        .area-p12 { grid-area: 2 / 1; } /* 父母 */
+        .area-center { grid-column: 2 / span 2; grid-row: 2 / span 2; }
+        
+        .palace-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; position: relative; overflow: hidden; min-height: 120px; transition: all 0.3s; padding: 4px; }
+        .palace-card:hover { border-color: #8b5cf6; box-shadow: 0 0 15px rgba(139, 92, 246, 0.3); transform: scale(1.02); z-index: 10; cursor: pointer; }
+        
+        .palace-watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 900; color: rgba(255, 255, 255, 0.04); pointer-events: none; z-index: 0; white-space: nowrap; }
+        .branch-badge { position: absolute; top: 6px; left: 8px; font-size: 0.75rem; font-weight: 700; color: #f59e0b; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 1px 6px; border-radius: 4px; z-index: 10;}
+        .star-item { position: relative; z-index: 1; font-size: 0.85rem; font-weight: 600; line-height: 1.4; }
+        
+        .layer-btn { transition: all 0.2s; }
+        .layer-btn.active { background-color: #9333ea; color: white; border-color: #a855f7; box-shadow: 0 0 10px rgba(168, 85, 247, 0.5); }
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+    <script src="/nav.js"></script>
+
+    <!-- Content -->
+    <div class="flex-1 max-w-7xl mx-auto p-4 w-full" id="main-content">
+        <!-- Error State -->
+        <div id="auth-error" class="hidden text-center py-20">
+            <h2 class="text-2xl font-bold text-red-400 mb-4">存取被拒絕</h2>
+            <p class="text-slate-400 mb-6">請先登入會員以存取專業排盤室。</p>
+            <a href="/login.html" class="bg-purple-600 px-6 py-2 rounded text-white font-bold hover:bg-purple-500 transition">前往登入</a>
+        </div>
+
+        <div id="chart-view" class="hidden grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- Left Sidebar -->
+            <div class="lg:col-span-1 space-y-4">
+                <div class="bg-surface p-4 rounded-xl shadow-lg border border-slate-700">
+                    <h2 class="text-lg font-bold text-slate-200 mb-2 border-b border-slate-700 pb-2 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span> 測算設定
+                    </h2>
+                    <div class="text-sm text-slate-400 mb-4">
+                        命主：<span id="p-name" class="font-bold text-white"></span><br>
+                        生辰：<span id="p-birth" class="text-purple-300"></span>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-xs text-slate-400 mb-1">目標推算時間 (流年/流月/流日)</label>
+                        <input type="date" id="targetDate" class="w-full bg-midnight border border-slate-600 rounded px-3 py-2 text-white outline-none">
+                    </div>
+                    <button onclick="fetchChart()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded transition shadow-lg">
+                        重新計算命盤
+                    </button>
+                </div>
+
+                <div class="bg-surface p-4 rounded-xl shadow-lg border border-slate-700 mt-4 text-center">
+                    <button onclick="openGlossary()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded shadow transition flex items-center justify-center gap-2">
+                        📖 開啟命理與財經辭典
+                    </button>
+                    <p class="text-xs text-slate-500 mt-2">內含閱讀流程、主星、宮位、地支詳解</p>
+                </div>
+                
+                <div class="bg-indigo-900/20 border border-indigo-700/50 p-4 rounded-xl text-xs text-indigo-200 leading-relaxed">
+                    <strong class="text-indigo-300 block mb-1">💡 宮位本位模式說明：</strong>
+                    此盤面採用「固定十二宮位」視角，命宮永遠在左上角。當您切換大運或流年時，觀察的是<span class="text-gold font-bold">「哪些地支與星曜飛入了這個宮位」</span>，讓分析財運(財帛宮)或事業(官祿宮)時更加直觀。<br><br>
+                    <strong class="text-purple-300">滑鼠游標停靠 (Hover) 在宮位上，可即時查看該宮位與星曜的完整涵義。</strong>
+                </div>
+            </div>
+
+            <!-- Floating Tooltip -->
+            <div id="floating-tooltip" class="hidden fixed bg-surface/95 backdrop-blur-md p-4 rounded-xl shadow-2xl border border-purple-500/50 w-72 z-[9999] pointer-events-none transform transition-opacity duration-200 opacity-0"></div>
+
+            <!-- Right Chart -->
+            <div class="lg:col-span-3">
+                <div class="flex gap-2 mb-4 overflow-x-auto pb-2 custom-scrollbar">
+                    <button onclick="switchLayer('natal')" id="btn-natal" class="layer-btn active px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">先天命盤</button>
+                    <button onclick="switchLayer('decade')" id="btn-decade" class="layer-btn px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">大運盤</button>
+                    <button onclick="switchLayer('annual')" id="btn-annual" class="layer-btn px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">流年盤</button>
+                    <button onclick="switchLayer('monthly')" id="btn-monthly" class="layer-btn px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">流月盤</button>
+                    <button onclick="switchLayer('daily')" id="btn-daily" class="layer-btn px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">流日盤</button>
+                </div>
+
+                <div class="chart-grid w-full aspect-square md:aspect-auto md:h-[650px] max-w-[800px] mx-auto" id="astrolabe">
+                    <!-- Fixed Palaces -->
+                    <div class="palace-card area-p1" id="box-命宮"><div class="palace-watermark">命宮</div></div>
+                    <div class="palace-card area-p2" id="box-兄弟"><div class="palace-watermark">兄弟</div></div>
+                    <div class="palace-card area-p3" id="box-夫妻"><div class="palace-watermark">夫妻</div></div>
+                    <div class="palace-card area-p4" id="box-子女"><div class="palace-watermark">子女</div></div>
+                    <div class="palace-card area-p5" id="box-財帛"><div class="palace-watermark">財帛</div></div>
+                    <div class="palace-card area-p6" id="box-疾厄"><div class="palace-watermark">疾厄</div></div>
+                    <div class="palace-card area-p7" id="box-遷移"><div class="palace-watermark">遷移</div></div>
+                    <div class="palace-card area-p8" id="box-交友"><div class="palace-watermark">交友</div></div>
+                    <div class="palace-card area-p9" id="box-官祿"><div class="palace-watermark">官祿</div></div>
+                    <div class="palace-card area-p10" id="box-田宅"><div class="palace-watermark">田宅</div></div>
+                    <div class="palace-card area-p11" id="box-福德"><div class="palace-watermark">福德</div></div>
+                    <div class="palace-card area-p12" id="box-父母"><div class="palace-watermark">父母</div></div>
+
+                    <!-- Center -->
+                    <div class="area-center flex flex-col items-center justify-center text-center p-4 bg-midnight/50 rounded-xl border border-slate-700 shadow-inner">
+                        <div id="c-lunar" class="text-lg font-serif text-slate-200 mb-3">農曆日期</div>
+                        <div class="flex flex-wrap justify-center gap-2 text-xs text-slate-400 mb-4">
+                            <span id="c-bureau" class="px-2 py-1 bg-slate-800 rounded border border-slate-600">五行局</span>
+                            <span id="c-year" class="px-2 py-1 bg-slate-800 rounded border border-slate-600 text-purple-400">流年</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-left text-xs bg-slate-800/80 p-3 rounded-lg border border-slate-600 w-full max-w-[200px]">
+                            <div class="text-green-400 font-bold">祿 <span class="text-slate-400 font-normal">機遇/資金</span></div>
+                            <div class="text-gold font-bold">權 <span class="text-slate-400 font-normal">擴張/強勢</span></div>
+                            <div class="text-blue-400 font-bold">科 <span class="text-slate-400 font-normal">平穩/名聲</span></div>
+                            <div class="text-red-400 font-bold">忌 <span class="text-slate-400 font-normal">風險/避險</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let userData = null;
+        let chartData = null;
+        let currentLayer = 'natal';
+        
+        const PALACE_NAMES = ["命宮", "兄弟", "夫妻", "子女", "財帛", "疾厄", "遷移", "交友", "官祿", "田宅", "福德", "父母"];
+
+        // Wait for auth
+        window.addEventListener('DOMContentLoaded', async () => {
+            userData = await fetchMe();
+            if(!userData) {
+                document.getElementById('auth-error').classList.remove('hidden');
+                return;
+            }
+            
+            document.getElementById('chart-view').classList.remove('hidden');
+            document.getElementById('p-name').innerText = userData.realName || userData.username;
+            document.getElementById('p-birth').innerText = `${userData.birthYear}/${userData.birthMonth}/${userData.birthDay} ${userData.birthHour}時`;
+            
+            // Set today as default
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            document.getElementById('targetDate').value = `${yyyy}-${mm}-${dd}`;
+
+            fetchChart();
+        });
+
+        async function fetchChart() {
+            if(!userData) return;
+            const targetDate = document.getElementById('targetDate').value;
+            
+            const req = {
+                year: userData.birthYear, month: userData.birthMonth, day: userData.birthDay, hour: userData.birthHour, targetDate
+            };
+
+            const res = await fetch('/api/calculate', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req)
+            });
+            const data = await res.json();
+            
+            if (!data.meta) {
+                console.error("Chart Data Error:", data);
+                alert("計算排盤失敗：" + (data.error || "未知錯誤"));
+                return;
+            }
+
+            document.getElementById('c-lunar').innerText = `本命: ${data.meta.lunarDate}\n流運: ${data.meta.targetLunarDate}`;
+            document.getElementById('c-bureau').innerText = `${data.meta.bureau}局`;
+            document.getElementById('c-year').innerText = `${data.meta.targetYear} ${data.meta.targetYearStem}`;
+
+            chartData = data.chart;
+            switchLayer(currentLayer);
+        }
+
+        function switchLayer(layer) {
+            currentLayer = layer;
+            document.querySelectorAll('.layer-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-purple-600', 'text-white');
+                btn.classList.add('bg-slate-800', 'text-slate-400');
+            });
+            const activeBtn = document.getElementById(`btn-${layer}`);
+            activeBtn.classList.add('active', 'bg-purple-600', 'text-white');
+            activeBtn.classList.remove('bg-slate-800', 'text-slate-400');
+
+            if(!chartData) return;
+
+            PALACE_NAMES.forEach(pName => {
+                const pDiv = document.getElementById(`box-${pName}`);
+                if(!pDiv) return;
+
+                // Find the branch data that corresponds to this Palace in the current layer
+                // Find the branch data that corresponds to this Palace, checking for common aliases
+                const pAliases = { '交友': '僕役', '官祿': '事業' };
+                const branchData = chartData.find(b => {
+                    if (!b.layers[layer] || !b.layers[layer].name) return false;
+                    const chartPalaceName = b.layers[layer].name;
+                    return chartPalaceName === pName || chartPalaceName === pAliases[pName];
+                });
+                if(!branchData) return; // Should not happen
+
+                // Clear dynamic content but keep watermark
+                Array.from(pDiv.children).forEach(c => {
+                    if(!c.classList.contains('palace-watermark')) c.remove();
+                });
+
+                // Add Dynamic Earthly Branch Badge
+                const bLabel = document.createElement('div');
+                bLabel.className = 'branch-badge';
+                bLabel.innerText = `${branchData.earthlyBranch}支`;
+                pDiv.appendChild(bLabel);
+
+                const layerData = branchData.layers[layer];
+                
+                // Stars container
+                const starContainer = document.createElement('div');
+                starContainer.className = 'absolute top-8 left-2 right-2 flex flex-col gap-1 z-10';
+                
+                layerData.stars.forEach(s => {
+                    const sDiv = document.createElement('div');
+                    sDiv.className = 'star-item ' + (s.includes('祿') ? 'text-green-400' : s.includes('忌') ? 'text-red-400' : 'text-slate-300');
+                    sDiv.innerText = s;
+                    starContainer.appendChild(sDiv);
+                });
+                pDiv.appendChild(starContainer);
+
+                // Hover Event
+                pDiv.onmouseenter = (e) => {
+                    const tooltip = document.getElementById('floating-tooltip');
+                    tooltip.classList.remove('hidden');
+                    // Slight delay to allow display:block before fading in
+                    setTimeout(() => tooltip.classList.remove('opacity-0'), 10);
+                    
+                    // Lookups from Glossary
+                    const bDesc = (GLOSSARY_DATA && GLOSSARY_DATA.branches[branchData.earthlyBranch]) ? GLOSSARY_DATA.branches[branchData.earthlyBranch] : '';
+                    const pDesc = (GLOSSARY_DATA && GLOSSARY_DATA.palaces[pName]) ? GLOSSARY_DATA.palaces[pName] : '無特別說明';
+                    
+                    let starDescHtml = '';
+                    layerData.stars.forEach(starStr => {
+                        const starBase = starStr.split(' ')[0].replace(/[祿權科忌]/g, '');
+                        if(GLOSSARY_DATA && GLOSSARY_DATA.stars[starBase]) {
+                            starDescHtml += `<div class="mb-2 bg-slate-900/50 p-2 rounded"><span class="text-purple-300 font-bold">${starBase}</span>: ${GLOSSARY_DATA.stars[starBase]}</div>`;
+                        }
+                        ['祿', '權', '科', '忌'].forEach(t => {
+                            if(starStr.includes(t)) {
+                                const tName = '化' + t;
+                                const tColor = t === '祿' ? 'text-green-400' : (t === '忌' ? 'text-red-400' : 'text-gold');
+                                if(GLOSSARY_DATA && GLOSSARY_DATA.trans[tName]) {
+                                    starDescHtml += `<div class="mb-1 ml-2 border-l-2 border-slate-600 pl-2"><span class="${tColor} font-bold">${tName}</span>: ${GLOSSARY_DATA.trans[tName]}</div>`;
+                                }
+                            }
+                        });
+                    });
+
+                    let layerTitle = layer === 'natal' ? '本命' : layer === 'decade' ? '大運' : layer === 'annual' ? '流年' : layer === 'monthly' ? '流月' : '流日';
+
+                    let html = `
+                        <div class="font-bold text-lg text-white mb-2 border-b border-slate-700 pb-2 flex justify-between items-end">
+                            <span>${layerTitle} ${pName} <span class="text-xs text-gold ml-2">(${branchData.earthlyBranch}位)</span></span>
+                        </div>
+                        <div class="text-sm text-amber-200 mb-3 bg-amber-900/40 p-2 rounded border border-amber-900/50 leading-relaxed shadow-inner">${pDesc}</div>
+                        <div class="text-xs text-slate-400 mb-3 italic border-l-2 border-slate-600 pl-2">${bDesc}</div>
+                    `;
+                    
+                    if(starDescHtml) {
+                        html += `<div class="text-xs text-slate-300 mt-2 space-y-1">${starDescHtml}</div>`;
+                    } else {
+                        html += `<div class="text-slate-500 mb-2 text-xs p-2 bg-slate-800 rounded text-center">此宮位目前無主星<br>運勢受對宮與外部環境牽引較大。</div>`;
+                    }
+                    
+                    tooltip.innerHTML = html;
+                    pDiv.classList.add('border-purple-500', 'bg-slate-800');
+                };
+
+                pDiv.onmousemove = (e) => {
+                    const tooltip = document.getElementById('floating-tooltip');
+                    let x = e.clientX + 15;
+                    let y = e.clientY + 15;
+                    
+                    // Prevent tooltip from going off-screen (right or bottom edge)
+                    const rect = tooltip.getBoundingClientRect();
+                    if (x + rect.width > window.innerWidth) {
+                        x = e.clientX - rect.width - 15;
+                    }
+                    if (y + rect.height > window.innerHeight) {
+                        y = e.clientY - rect.height - 15;
+                    }
+                    
+                    tooltip.style.left = x + 'px';
+                    tooltip.style.top = y + 'px';
+                };
+
+                pDiv.onmouseleave = () => {
+                    const tooltip = document.getElementById('floating-tooltip');
+                    tooltip.classList.add('opacity-0');
+                    setTimeout(() => {
+                        if(tooltip.classList.contains('opacity-0')) {
+                            tooltip.classList.add('hidden');
+                        }
+                    }, 200); // Wait for fade out
+                    pDiv.classList.remove('border-purple-500', 'bg-slate-800');
+                };
+            });
+        }
+    </script>
+</body>
+</html>

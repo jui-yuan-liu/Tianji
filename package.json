@@ -1,0 +1,28 @@
+{
+  "name": "tianji",
+  "version": "1.0.0",
+  "description": "結合傳統紫微斗數命理學與現代金融投資策略，為使用者提供基於個人運勢（命盤、大運、流年、流月、流日）的投資建議。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "init:db": "node src/sync_stocks.js && node src/stock_features.js",
+    "start": "npm run init:db && node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "axios": "^1.14.0",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.6.2",
+    "body-parser": "^2.2.2",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "lunar-javascript": "^1.7.7"
+  }
+}

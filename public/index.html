@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tianji 天機 - 會員專區</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/app.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .bg-surface { background-color: #1e293b; }
+        .text-gold { color: #f59e0b; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+    <script src="/nav.js"></script>
+
+    <div id="unauth-view" class="flex-1 flex flex-col items-center justify-center p-8 text-center mt-20">
+        <h1 class="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400">登入天機會員系統</h1>
+        <p class="text-slate-400 mb-8 max-w-md">歡迎來到天機。請登入以存取您的專屬運勢分析、智能排盤與兩年台股投資回測數據。</p>
+        <a href="/login.html" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition transform hover:scale-105">立即登入 / 免費註冊</a>
+    </div>
+
+    <div id="auth-view" class="hidden flex-1 max-w-7xl mx-auto p-4 lg:p-8 w-full">
+        <!-- Dashboard Header removed -->
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left: Daily Fortune -->
+            <div class="lg:col-span-1 space-y-8">
+                <div class="bg-surface rounded-2xl p-6 border border-slate-700 shadow-xl">
+                    <h3 class="text-xl font-bold text-slate-200 mb-4 flex items-center border-b border-slate-700 pb-2">
+                        <span class="w-1 h-6 bg-gold rounded mr-2"></span> 今日運勢分析
+                    </h3>
+                    <div id="daily-loading" class="text-slate-500 text-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mx-auto mb-2"></div>
+                        分析運算中...
+                    </div>
+                    <div id="daily-content" class="hidden">
+                        <div class="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-600 mb-4">
+                            <span class="text-slate-300 font-bold">綜合運勢評分</span>
+                            <span id="d-score" class="text-3xl font-bold">--</span>
+                        </div>
+                        <div class="space-y-3 text-sm">
+                            <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
+                                <div class="text-xs text-slate-500 mb-1">財帛宮星象</div>
+                                <div id="d-stars" class="font-bold text-purple-300">--</div>
+                            </div>
+                            <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
+                                <div class="text-xs text-slate-500 mb-1">今日四化</div>
+                                <div id="d-trans" class="font-bold text-gold">--</div>
+                            </div>
+                            <div class="p-4 bg-indigo-900/30 border border-indigo-500/30 rounded text-slate-300 leading-relaxed" id="d-desc">--</div>
+                            <div class="p-4 bg-amber-900/30 border border-amber-500/30 rounded text-amber-200 font-bold" id="d-strat">--</div>
+                            <div id="d-stocks-container" class="hidden">
+                                <div class="text-xs text-slate-500 mb-2 border-b border-slate-700 pb-1">標籤匹配推薦</div>
+                                <div id="d-stocks" class="flex flex-wrap gap-2 mb-4"></div>
+                                <div class="text-xs text-slate-500 mb-2 border-b border-slate-700 pb-1">命盤共振精選 (Top 10)</div>
+                                <div id="d-resonance" class="space-y-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Chart & Backtest -->
+            <div class="lg:col-span-2 space-y-8">
+                    <div class="bg-surface rounded-2xl p-6 border border-slate-700 shadow-xl">
+                        <h3 class="text-xl font-bold text-slate-200 mb-4 flex justify-between items-center border-b border-slate-700 pb-2">
+                            <div class="flex items-center">
+                                <span class="w-1 h-6 bg-purple-500 rounded mr-2"></span> 今日 AI 實戰推論建議
+                            </div>
+                            <div class="flex items-center text-sm">
+                                <span class="text-slate-400 mr-2">選擇模型:</span>
+                                <select id="model-selector" class="bg-slate-700 text-white border border-slate-600 rounded px-2 py-1 focus:outline-none focus:border-purple-500 transition">
+                                    <option value="static">靜態命理策略 (預設)</option>
+                                </select>
+                            </div>
+                        </h3>
+                        <div class="flex flex-col space-y-4">
+                            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-600">
+                                <span class="text-slate-400">當前模型判斷動作：</span>
+                                <span id="ai-today-action" class="text-2xl font-bold text-slate-500 animate-pulse">計算中...</span>
+                            </div>
+                            <div class="bg-indigo-900/30 p-4 rounded-xl border border-indigo-500/30">
+                                <h4 class="text-sm text-slate-400 mb-2 font-bold">推論依據與可解釋性 (Explainability)</h4>
+                                <p id="ai-today-reason" class="text-slate-300 leading-relaxed text-sm mb-4">載入中...</p>
+                                <div id="shap-container" class="hidden">
+                                    <h5 class="text-xs text-slate-400 mb-2 border-b border-indigo-500/30 pb-1">決策因子影響力 (Factor Contributions)</h5>
+                                    <div id="shap-bars" class="space-y-1"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                <!-- Market Chart -->
+                <div class="bg-surface rounded-2xl p-6 border border-slate-700 shadow-xl">
+                    <h3 class="text-xl font-bold text-slate-200 mb-4 flex items-center border-b border-slate-700 pb-2">
+                        <span class="w-1 h-6 bg-blue-500 rounded mr-2"></span> 大盤趨勢 (TAIEX)
+                    </h3>
+                    <div id="chart-container" class="w-full h-[400px] rounded-lg overflow-hidden border border-slate-600"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chart;
+        let candlestickSeries;
+
+        async function initDashboard() {
+            const user = await fetchMe();
+            if (!user) {
+                document.getElementById('unauth-view').classList.remove('hidden');
+                document.getElementById('auth-view').classList.add('hidden');
+                return;
+            }
+
+            document.getElementById('unauth-view').classList.add('hidden');
+            document.getElementById('auth-view').classList.remove('hidden');
+
+            // Setup Chart
+            chart = LightweightCharts.createChart(document.getElementById('chart-container'), {
+                layout: { background: { type: 'solid', color: '#0f172a' }, textColor: '#cbd5e1' },
+                grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                timeScale: { borderColor: '#334155' },
+                rightPriceScale: { borderColor: '#334155' }
+            });
+            candlestickSeries = chart.addCandlestickSeries({
+                upColor: '#ef4444', downColor: '#10b981', borderUpColor: '#ef4444', borderDownColor: '#10b981', wickUpColor: '#ef4444', wickDownColor: '#10b981'
+            });
+
+            // Fetch Market Data
+            await fetch('/api/market-data').then(r => r.json()).then(data => {
+                if(data && data.length > 0) {
+                    candlestickSeries.setData(data);
+                    chart.timeScale().fitContent();
+                }
+            });
+
+            await fetchModelsAndRun(user);
+
+
+            // Fetch Daily Fortune
+            const today = new Date().toISOString().split('T')[0];
+            fetch(`/api/daily-fortune?date=${today}&birthYear=${user.birthYear}&birthMonth=${user.birthMonth}&birthDay=${user.birthDay}&birthHour=${user.birthHour}`)
+                .then(r => r.json()).then(data => {
+                    document.getElementById('daily-loading').classList.add('hidden');
+                    document.getElementById('daily-content').classList.remove('hidden');
+                    
+                    const adv = data.user.advice;
+                    const elScore = document.getElementById('d-score');
+                    elScore.innerText = adv.score;
+                    elScore.className = `text-3xl font-bold ${adv.score >= 60 ? 'text-green-400' : (adv.score <= 40 ? 'text-red-400' : 'text-yellow-400')}`;
+                    
+                    document.getElementById('d-stars').innerText = data.user.daily.wealthStars.join(', ');
+                    document.getElementById('d-trans').innerHTML = `<span class="text-green-400">祿:${data.user.daily.lu}</span> | <span class="text-red-400">忌:${data.user.daily.ji}</span>`;
+                    document.getElementById('d-desc').innerText = adv.details;
+                    document.getElementById('d-strat').innerText = `【策略】${adv.strategy}`;
+
+                    // Fetch Natal matched stocks
+                    fetch('/api/calculate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            year: user.birthYear, 
+                            month: user.birthMonth, 
+                            day: user.birthDay, 
+                            hour: user.birthHour 
+                        })
+                    }).then(r => r.json()).then(calcData => {
+                        const matched = calcData.strategy.matchedStocks;
+                        const resonance = calcData.strategy.resonanceStocks;
+                        
+                        if ((matched && matched.stocks && matched.stocks.length > 0) || (resonance && resonance.length > 0)) {
+                            const container = document.getElementById('d-stocks-container');
+                            container.classList.remove('hidden');
+
+                            if (matched && matched.stocks) {
+                                document.getElementById('d-stocks').innerHTML = matched.stocks.map(s => `
+                                    <span class="px-2 py-1 bg-blue-900/50 border border-blue-500/30 rounded text-blue-300 text-xs">
+                                        ${s.code} ${s.name}
+                                    </span>
+                                `).join('');
+                            }
+
+                            if (resonance) {
+                                document.getElementById('d-resonance').innerHTML = resonance.map(s => `
+                                    <div class="p-2 bg-slate-800 rounded border border-slate-700">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="text-gold font-bold text-xs">${s.code} ${s.name}</span>
+                                            <span class="text-[10px] text-slate-500">契合度: ${s.score}</span>
+                                        </div>
+                                        <div class="text-[10px] text-slate-400 leading-tight">
+                                            ${s.reasons.map(r => `• ${r}`).join('<br>')}
+                                        </div>
+                                    </div>
+                                `).join('');
+                            }
+                        }
+                    });
+                });
+        } // close initDashboard
+            
+                let currentModelId = 'latest';
+
+        async function fetchModelsAndRun(user) {
+            try {
+                const token = localStorage.getItem('tianji_token');
+                const res = await fetch('/api/models', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                const selector = document.getElementById('model-selector');
+                selector.innerHTML = '<option value="static">靜態命理策略 (預設)</option>';
+
+                if (data.models && data.models.length > 0) {
+                    data.models.forEach(model => {
+                        const opt = document.createElement('option');
+                        opt.value = model.id;
+                        opt.textContent = `AI 模型 - ${model.name || model.id.substring(0,8)} (ROI: ${model.roi || 'N/A'}%)`;
+                        selector.appendChild(opt);
+                    });
+                    currentModelId = data.models[0].id;
+                } else {
+                    currentModelId = 'static';
+                }
+                
+                selector.value = currentModelId;
+                
+                // Add event listener for selection change
+                selector.addEventListener('change', (e) => {
+                    currentModelId = e.target.value;
+                    runBacktestData(user);
+                });
+
+            } catch (e) {
+                console.error('Fetch models failed', e);
+                currentModelId = 'static';
+            }
+            runBacktestData(user);
+        }
+
+        async function runBacktestData(user) {
+            document.getElementById('ai-today-action').innerText = '計算中...';
+            document.getElementById('ai-today-action').className = 'text-2xl font-bold text-slate-500 animate-pulse';
+            document.getElementById('ai-today-reason').innerText = '載入中...';
+            
+            fetch(`/api/backtest?userId=${user.id}&modelId=${currentModelId}&birthYear=${user.birthYear}&birthMonth=${user.birthMonth}&birthDay=${user.birthDay}&birthHour=${user.birthHour}`)
+                .then(r => r.json()).then(data => {
+                    const lastSignal = data.lastSignal || 'HOLD';
+                    const lastReason = data.lastReason || '無法取得可解釋性分析。';
+                    const actionEl = document.getElementById('ai-today-action');
+                    if(actionEl) {
+                        actionEl.innerText = lastSignal;
+                        actionEl.className = `text-2xl font-bold ${lastSignal === 'BUY' ? 'text-green-400' : (lastSignal === 'SELL' ? 'text-red-400' : 'text-slate-400')}`;
+                    }
+                    const reasonEl = document.getElementById('ai-today-reason');
+                    if(reasonEl) {
+                        reasonEl.innerText = lastReason;
+                    }
+
+                    const shapContainer = document.getElementById('shap-container');
+                    const shapBars = document.getElementById('shap-bars');
+                    if (data.lastFactors && data.lastFactors.length > 0) {
+                        shapContainer.classList.remove('hidden');
+                        shapBars.innerHTML = data.lastFactors.map(f => {
+                            const isPositive = f.value >= 0;
+                            const width = Math.min(Math.abs(f.value) * 100, 100);
+                            const colorClass = isPositive ? 'bg-green-500' : 'bg-red-500';
+                            
+                            return `
+                            <div class="flex items-center text-xs">
+                                <div class="w-1/3 text-right pr-2 text-slate-400 truncate">${f.name}</div>
+                                <div class="w-2/3 flex items-center">
+                                    <div class="w-1/2 flex justify-end pr-1">
+                                        ${!isPositive ? `<div class="${colorClass} h-1.5 rounded-l" style="width: ${width}%"></div>` : ''}
+                                    </div>
+                                    <div class="w-[1px] h-3 bg-slate-500"></div>
+                                    <div class="w-1/2 flex justify-start pl-1">
+                                        ${isPositive ? `<div class="${colorClass} h-1.5 rounded-r" style="width: ${width}%"></div>` : ''}
+                                    </div>
+                                </div>
+                            </div>`;
+                        }).join('');
+                    } else {
+                        shapContainer.classList.add('hidden');
+                    }
+
+                    if (data.markers && data.markers.length > 0 && candlestickSeries) {
+                        const sortedMarkers = data.markers
+                            .filter(m => m.time)
+                            .map(m => ({
+                                time: m.time,
+                                position: m.position,
+                                color: m.color,
+                                shape: m.shape,
+                                text: m.text
+                            }))
+                            .sort((a, b) => new Date(a.time) - new Date(b.time));
+                            
+                        const uniqueMarkers = [];
+                        const seenTimes = new Set();
+                        for (const marker of sortedMarkers) {
+                            if (!seenTimes.has(marker.time)) {
+                                seenTimes.add(marker.time);
+                                uniqueMarkers.push(marker);
+                            }
+                        }
+                        candlestickSeries.setMarkers(uniqueMarkers);
+                    } else if (candlestickSeries) {
+                        candlestickSeries.setMarkers([]);
+                    }
+                }).catch(err => {
+                    console.error("Backtest chart update failed", err);
+                    document.getElementById('ai-today-action').innerText = '無信號';
+                    document.getElementById('ai-today-action').className = 'text-2xl font-bold text-slate-500';
+                    document.getElementById('ai-today-reason').innerText = '獲取數據失敗。';
+                });
+        }
+
+        window.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html>

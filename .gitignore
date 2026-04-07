@@ -1,0 +1,17 @@
+data
+node_modules/
+.env
+.DS_Store
+.vscode/
+.idea/
+models/
+tianji.db
+server.log
+training.log*
+server.log*
+*.log*
+*.log
+*.log.*
+*.log.*.*
+*.log.*.*.*
+*.log.*.*.*.*

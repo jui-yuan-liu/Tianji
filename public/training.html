@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天機 - AI 專屬模型訓練 (Phase 4)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#0f172a',
+                        surface: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Serif TC', serif; background-color: #0f172a; color: #f8fafc; }
+        #floating-tooltip { transition: opacity 0.2s; pointer-events: none; z-index: 9999; }
+    </style>
+</head>
+<body class="bg-background text-slate-200 antialiased h-screen flex flex-col">
+
+    <script src="/app.js"></script>
+    <script src="/nav.js"></script>
+    <script src="/glossary.js"></script>
+
+    <!-- Floating Tooltip -->
+    <div id="floating-tooltip" class="hidden fixed bg-slate-800/95 backdrop-blur-md p-3 rounded-lg shadow-2xl border border-purple-500/50 w-64 text-xs leading-relaxed opacity-0"></div>
+
+    <main class="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <h1 class="text-3xl font-bold mb-6 text-purple-400">專屬 AI 交易代理人訓練</h1>
+        <p class="mb-6 text-slate-400">結合您的命盤（福德宮風險偏好、流日四化）與歷史大盤數據，透過深度強化學習 (DQN) 訓練專屬的量化交易模型。</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Control Panel -->
+            <div class="bg-surface p-6 rounded-xl border border-slate-700 shadow-xl col-span-1">
+                <h2 class="text-xl font-bold mb-4 text-white border-b border-slate-600 pb-2">訓練設定</h2>
+                <div class="space-y-4">
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-400 mb-1">訓練起點 (Start Date)</label>
+                            <input type="date" id="train-start" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-400 mb-1">訓練終點 (End Date)</label>
+                            <input type="date" id="train-end" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-400 mb-1" title="Epochs: 模型完整掃描一次歷史數據的次數。較多世代能提高擬合度，但過多(>200)可能導致過擬合。建議範位：20-100。">訓練世代 (Epochs)</label>
+                            <input type="number" id="epochs" value="50" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-400 mb-1" title="Batch Size: 每次更新權重所使用的樣本數量。較大值能穩定梯度，但需要更多內存；較小值(8-16)具備隨機性，有助於跳出局部最優解。建議範圍：16-64。">批次大小 (Batch Size)</label>
+                            <input type="number" id="batch" value="32" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-400 mb-1" title="Learning Rate: 控制 AI 每次調整權重的步長。太高(>0.01)會導致訓練不穩定甚至發散；太低(<0.0001)則收斂極慢。建議值：0.001。">學習率 (LR)</label>
+                            <input type="number" step="0.0001" id="lr" value="0.001" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-400 mb-1" title="Gamma: 衡量未來收益相對於當前收益的重視程度。接近 1 (如 0.99) 會使 AI 更有遠見，重視長期 ROI；接近 0 則會讓 AI 變得短視。建議範圍：0.90-0.99。">折扣因子 (Gamma)</label>
+                            <input type="number" step="0.01" id="gamma" value="0.95" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1" title="Epsilon Decay: 控制 AI 從隨機探索過渡到利用既有策略的速度。越接近 1 (如 0.999) 探索時間越長，有助於發現新策略；較低值(如 0.9) 則快速進入實戰應用。建議值：0.995。">探索衰減率 (Epsilon Decay)</label>
+                        <input type="number" step="0.001" id="decay" value="0.995" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">初始模擬資金 (NTD)</label>
+                        <input type="number" value="100000" disabled class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-slate-500 cursor-not-allowed">
+                    </div>
+                    <div id="user-info" class="text-sm text-yellow-400 mt-2">載入使用者命盤資訊中...</div>
+                    <button id="start-btn" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-4 rounded shadow-lg transition mt-4 disabled:opacity-50">
+                        ▶ 開始訓練
+                    </button>
+                    <button onclick="openGlossary()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 rounded shadow transition mt-2 flex items-center justify-center gap-2 text-sm">
+                        📖 命理與財經辭典
+                    </button>
+                    <div id="status-msg" class="text-sm text-slate-400 text-center"></div>
+                </div>
+            </div>
+
+            <!-- Dashboard -->
+            <div class="col-span-1 lg:col-span-2 space-y-6">
+                <!-- Metrics -->
+                <div class="grid grid-cols-4 gap-4">
+                    <div class="bg-surface p-4 rounded-xl border border-slate-700 text-center">
+                        <div class="text-xs text-slate-400">當前世代</div>
+                        <div class="text-xl font-bold text-white" id="m-epoch">0 / 0</div>
+                    </div>
+                    <div class="bg-surface p-4 rounded-xl border border-slate-700 text-center">
+                        <div class="text-xs text-slate-400">最終資產淨值</div>
+                        <div class="text-xl font-bold text-green-400" id="m-portfolio">$0</div>
+                    </div>
+                    <div class="bg-surface p-4 rounded-xl border border-slate-700 text-center">
+                        <div class="text-xs text-slate-400">當前報酬率</div>
+                        <div class="text-xl font-bold text-yellow-400" id="m-roi">0.00%</div>
+                    </div>
+                    <div class="bg-surface p-4 rounded-xl border border-slate-700 text-center">
+                        <div class="text-xs text-slate-400">探索率 (ε)</div>
+                        <div class="text-xl font-bold text-blue-400" id="m-epsilon">1.000</div>
+                    </div>
+                </div>
+
+                <!-- Chart -->
+                <div class="bg-surface p-6 rounded-xl border border-slate-700 shadow-xl relative" style="height: 400px;">
+                    <canvas id="rewardChart"></canvas>
+                </div>
+
+                <!-- Backtest Results -->
+                <div class="bg-surface p-6 rounded-xl border border-slate-700 shadow-xl">
+                    <h3 class="text-xl font-bold text-slate-200 mb-4 flex items-center border-b border-slate-700 pb-2 justify-between">
+                        <div class="flex items-center"><span class="w-1 h-6 bg-red-500 rounded mr-2"></span> 模型回測結果</div>
+                        <div class="flex items-center gap-2">
+                            <select id="model-select" class="bg-slate-800 border border-slate-600 text-sm text-slate-300 py-1 px-2 rounded outline-none focus:border-purple-500 transition">
+                                <option value="static">靜態命理策略</option>
+                            </select>
+                            <span id="bt-roi" class="px-3 py-1 rounded bg-slate-800 text-sm font-bold">尚未載入</span>
+                        </div>
+                    </h3>
+
+                    <div class="flex flex-col sm:flex-row gap-4 mb-4 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-slate-400 mb-1">回測起點 (Start Date)</label>
+                            <input type="date" id="bt-start" class="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-white text-sm focus:border-purple-500 outline-none transition">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-slate-400 mb-1">回測終點 (End Date)</label>
+                            <input type="date" id="bt-end" class="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-white text-sm focus:border-purple-500 outline-none transition">
+                        </div>
+                        <div class="flex items-end">
+                            <button id="bt-run-btn" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 px-4 rounded text-sm shadow transition border border-purple-500">執行回測</button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-600 text-center">
+                            <div class="text-xs text-slate-400 mb-1">初始資金</div>
+                            <div class="text-xl font-bold text-white" id="bt-init">$100,000</div>
+                        </div>
+                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-600 text-center">
+                            <div class="text-xs text-slate-400 mb-1">最終淨值</div>
+                            <div class="text-xl font-bold text-yellow-400" id="bt-final">--</div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-2 mb-6">
+                        <div class="bg-slate-800 p-2 rounded border border-slate-600 text-center">
+                            <div class="text-[10px] text-slate-400 mb-1">勝率 (Win Rate)</div>
+                            <div class="text-md font-bold text-green-400" id="bt-winrate">--</div>
+                        </div>
+                        <div class="bg-slate-800 p-2 rounded border border-slate-600 text-center">
+                            <div class="text-[10px] text-slate-400 mb-1">最大回撤 (MDD)</div>
+                            <div class="text-md font-bold text-red-400" id="bt-mdd">--</div>
+                        </div>
+                        <div class="bg-slate-800 p-2 rounded border border-slate-600 text-center">
+                            <div class="text-[10px] text-slate-400 mb-1">超額報酬 (Alpha)</div>
+                            <div class="text-md font-bold text-purple-400" id="bt-alpha">--</div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-sm text-slate-300 font-bold mb-2 flex justify-between">
+                        <span>歷史交易訊號 (近期)</span>
+                        <span id="bt-model-type" class="text-xs text-purple-400 font-bold border border-purple-500 px-1 rounded">載入中...</span>
+                    </div>
+                    <div id="bt-chart-container" class="w-full h-[300px] rounded-lg overflow-hidden border border-slate-600"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-surface p-6 rounded-xl border border-slate-700 shadow-xl mt-6">
+            <h2 class="text-xl font-bold mb-4 text-white border-b border-slate-600 pb-2 flex justify-between">
+                <span>已訓練模型清單 (Models History)</span>
+                <span id="fine-tune-status" class="text-sm text-yellow-400 font-bold hidden bg-slate-800 px-3 py-1 rounded"></span>
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-slate-300 text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 text-slate-400">
+                            <th class="py-2">模型名稱</th>
+                            <th class="py-2">訓練世代</th>
+                            <th class="py-2">回測 ROI</th>
+                            <th class="py-2">建立時間</th>
+                            <th class="py-2 text-right">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="model-list-body">
+                        <tr><td colspan="5" class="text-center py-4 text-slate-500">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+
+
+        let selectedBaseModelId = null;
+        let modelsCache = [];
+        let currentModelId = 'latest';
+        let btChart = null;
+        let btCandleSeries = null;
+
+
+        async function runBacktestData(user) {
+            if(!document.getElementById('bt-roi')) return;
+            document.getElementById('bt-roi').innerText = '載入中...';
+            document.getElementById('bt-roi').className = 'px-3 py-1 rounded bg-slate-800 text-sm font-bold text-slate-300';
+            
+            const startNode = document.getElementById('bt-start');
+            const endNode = document.getElementById('bt-end');
+            const startDate = startNode ? startNode.value : '';
+            const endDate = endNode ? endNode.value : '';
+            
+            let url = `/api/backtest?userId=${user.id}&modelId=${currentModelId}&birthYear=${user.birthYear}&birthMonth=${user.birthMonth}&birthDay=${user.birthDay}&birthHour=${user.birthHour}`;
+            if (startDate) url += `&startDate=${startDate}`;
+            if (endDate) url += `&endDate=${endDate}`;
+            
+            fetch(url)
+                .then(r => r.json()).then(async data => {
+                    document.getElementById('bt-final').innerText = `${Number(data.finalValue).toLocaleString()}`;
+                    const isPos = data.roi >= 0;
+                    document.getElementById('bt-roi').innerText = `ROI: ${isPos ? '+' : ''}${data.roi}%`;
+                    document.getElementById('bt-roi').className = `px-3 py-1 rounded text-sm font-bold ${isPos ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`;
+                    
+                    document.getElementById('bt-winrate').innerText = `${data.winRate}%`;
+                    document.getElementById('bt-mdd').innerText = `-${data.maxDrawdown}%`;
+                    document.getElementById('bt-alpha').innerText = `${data.alpha > 0 ? '+' : ''}${data.alpha}%`;
+                    document.getElementById('bt-model-type').innerText = data.isAI ? 'AI 專屬模型' : '靜態命理策略';
+
+                    // Initialize lightweight chart if not exist
+                    if (!btChart) {
+                        btChart = LightweightCharts.createChart(document.getElementById('bt-chart-container'), {
+                            layout: { background: { type: 'solid', color: '#0f172a' }, textColor: '#cbd5e1' },
+                            grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+                            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                            timeScale: { borderColor: '#334155' },
+                            rightPriceScale: { borderColor: '#334155' }
+                        });
+                        btCandleSeries = btChart.addCandlestickSeries({
+                            upColor: '#ef4444', downColor: '#10b981', borderUpColor: '#ef4444', borderDownColor: '#10b981', wickUpColor: '#ef4444', wickDownColor: '#10b981'
+                        });
+                    }
+
+                    // Fetch market data to set candlestick values
+                    try {
+                        const mdRes = await fetch('/api/market-data');
+                        let mdData = await mdRes.json();
+                        if (startDate) mdData = mdData.filter(d => d.time >= startDate);
+                        if (endDate) mdData = mdData.filter(d => d.time <= endDate);
+                        if(mdData && mdData.length > 0 && btCandleSeries) {
+                            btCandleSeries.setData(mdData);
+                            btChart.timeScale().fitContent();
+                        }
+                    } catch(e) { console.error("Market data fetch error for chart:", e); }
+
+                    if (data.markers && data.markers.length > 0 && btCandleSeries) {
+                        const sortedMarkers = data.markers
+                            .filter(m => m.time)
+                            .map(m => ({
+                                time: m.time,
+                                position: m.position,
+                                color: m.color,
+                                shape: m.shape,
+                                text: m.text
+                            }))
+                            .sort((a, b) => new Date(a.time) - new Date(b.time));
+                            
+                        const uniqueMarkers = [];
+                        const seenTimes = new Set();
+                        for (const marker of sortedMarkers) {
+                            if (!seenTimes.has(marker.time)) {
+                                seenTimes.add(marker.time);
+                                uniqueMarkers.push(marker);
+                            }
+                        }
+                        btCandleSeries.setMarkers(uniqueMarkers);
+                    } else if (btCandleSeries) {
+                        btCandleSeries.setMarkers([]);
+                    }
+                }).catch(err => {
+                    console.error("Backtest Error:", err);
+                    document.getElementById('bt-roi').innerText = '回測失敗';
+                    const chartCont = document.getElementById('bt-chart-container');
+                    if (chartCont) chartCont.innerHTML = '<div class="text-red-400 text-center py-4">無法載入回測資料</div>';
+                });
+        }
+
+        async function loadModels() {
+            try {
+                const token = localStorage.getItem('tianji_token');
+                const res = await fetch('/api/models', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const tbody = document.getElementById('model-list-body');
+                modelsCache = data.models || [];
+
+                if (modelsCache.length > 0) {
+                    tbody.innerHTML = modelsCache.map(m => `
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
+                            <td class="py-3 font-bold text-purple-300">${m.name}</td>
+                            <td class="py-3">${m.epochs}</td>
+                            <td class="py-3 font-bold ${parseFloat(m.roi) >= 0 ? 'text-green-400' : 'text-red-400'}">${m.roi}%</td>
+                            <td class="py-3 text-slate-500">${new Date(m.createdAt).toLocaleString()}</td>
+                            <td class="py-3 text-right">
+                                <button onclick="selectFineTune('${m.id}', '${m.name}')" 
+                                        class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded mr-2 tooltip-trigger"
+                                        title="微調：載入此模型的權重並繼續訓練。適合在市場環境改變時進行增量學習。">微調</button>
+                                <button onclick="deleteModel('${m.id}')" class="text-xs bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded">刪除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    // Re-init tooltips for dynamic content
+                    initTooltips();
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-slate-500">尚無訓練模型</td></tr>';
+                }
+
+                // Update Backtest Model Select
+                const select = document.getElementById('model-select');
+                if (select) {
+                    const prevVal = select.value;
+                    select.innerHTML = '<option value="static">靜態命理策略</option>';
+                    if (modelsCache.length > 0) {
+                        modelsCache.forEach(m => {
+                            select.innerHTML += `<option value="${m.id}">${m.name} (ROI: ${m.roi}%)</option>`;
+                        });
+                        if (prevVal === 'static' && modelsCache.length > 0 && currentModelId !== 'latest') {
+                            select.value = prevVal;
+                        } else {
+                            if(modelsCache.find(m => m.id === currentModelId)) {
+                                select.value = currentModelId;
+                            } else {
+                                select.value = modelsCache[0].id;
+                                currentModelId = modelsCache[0].id;
+                                if (currentUser) runBacktestData(currentUser);
+                            }
+                        }
+                    } else {
+                        currentModelId = 'static';
+                        select.value = 'static';
+                        if (currentUser) runBacktestData(currentUser);
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function deleteModel(id) {
+            if(!confirm('確定要刪除這個模型嗎？這會遺失訓練權重！')) return;
+            try {
+                const token = localStorage.getItem('tianji_token');
+                await fetch(`/api/models/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if(selectedBaseModelId === id) cancelFineTune();
+                loadModels();
+            } catch(e) { console.error(e); }
+        }
+
+        function selectFineTune(id, name) {
+            selectedBaseModelId = id;
+            const model = modelsCache.find(m => m.id === id);
+            
+            // Auto-populate hyperparameters if available
+            if (model && model.hyperParams) {
+                if (model.hyperParams.batchSize) document.getElementById('batch').value = model.hyperParams.batchSize;
+                if (model.hyperParams.learningRate) document.getElementById('lr').value = model.hyperParams.learningRate;
+                if (model.hyperParams.gamma) document.getElementById('gamma').value = model.hyperParams.gamma;
+                if (model.hyperParams.epsilonDecay) document.getElementById('decay').value = model.hyperParams.epsilonDecay;
+                document.getElementById('epochs').value = 20; // Suggest a smaller epoch for fine-tuning
+            }
+
+            const ft = document.getElementById('fine-tune-status');
+            ft.innerHTML = `正在微調: ${name} <button onclick="cancelFineTune()" class="ml-2 text-white hover:text-red-400 underline cursor-pointer">取消</button>`;
+            ft.classList.remove('hidden');
+            const btn = document.getElementById('start-btn');
+            btn.innerText = '▶ 開始微調 (Fine-tune)';
+            btn.classList.replace('bg-purple-600', 'bg-indigo-600');
+            btn.classList.replace('hover:bg-purple-500', 'hover:bg-indigo-500');
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+
+        function cancelFineTune() {
+            selectedBaseModelId = null;
+            document.getElementById('fine-tune-status').classList.add('hidden');
+            const btn = document.getElementById('start-btn');
+            btn.innerText = '▶ 開始訓練';
+            btn.classList.replace('bg-indigo-600', 'bg-purple-600');
+            btn.classList.replace('hover:bg-indigo-500', 'hover:bg-purple-500');
+        }
+
+        let currentUser = null;
+        let chartInstance = null;
+        
+        // Init Tooltips logic
+        function initTooltips() {
+            const tooltip = document.getElementById('floating-tooltip');
+            document.querySelectorAll('[title]').forEach(el => {
+                const title = el.getAttribute('title');
+                if(!title) return;
+
+                el.addEventListener('mouseenter', (e) => {
+                    tooltip.innerHTML = `<div class="font-bold text-purple-300 mb-1 border-b border-slate-700 pb-1">說明</div><div>${title}</div>`;
+                    tooltip.classList.remove('hidden');
+                    setTimeout(() => tooltip.classList.remove('opacity-0'), 10);
+                });
+
+                el.addEventListener('mousemove', (e) => {
+                    let x = e.clientX + 15;
+                    let y = e.clientY + 15;
+                    const rect = tooltip.getBoundingClientRect();
+                    if (x + rect.width > window.innerWidth) x = e.clientX - rect.width - 15;
+                    if (y + rect.height > window.innerHeight) y = e.clientY - rect.height - 15;
+                    tooltip.style.left = x + 'px';
+                    tooltip.style.top = y + 'px';
+                });
+
+                el.addEventListener('mouseleave', () => {
+                    tooltip.classList.add('opacity-0');
+                    setTimeout(() => { if(tooltip.classList.contains('opacity-0')) tooltip.classList.add('hidden'); }, 200);
+                });
+                
+                // Hide native title but keep it in dataset
+                el.dataset.title = title;
+                el.removeAttribute('title');
+            });
+        }
+
+        // Init Chart
+        const ctx = document.getElementById('rewardChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '訓練世代報酬率 (ROI)',
+                    data: [],
+                    borderColor: 'rgb(168, 85, 247)', // purple-500
+                    backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: '#94a3b8' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        ticks: { color: '#94a3b8' }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#fff' } }
+                }
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            currentUser = await fetchMe();
+            if (!currentUser) {
+                document.getElementById('user-info').innerText = '請先登入以載入命盤！';
+                document.getElementById('start-btn').disabled = true;
+                return;
+            }
+            document.getElementById('user-info').innerText = 
+                `已綁定命盤：${currentUser.birthYear}年${currentUser.birthMonth}月${currentUser.birthDay}日 ${currentUser.birthHour}時`;
+            
+            // 設置預設日期區間 (今天往回推兩年)
+            const today = new Date();
+            const twoYearsAgo = new Date();
+            twoYearsAgo.setFullYear(today.getFullYear() - 2);
+            
+            const formatDate = (d) => d.toISOString().split('T')[0];
+            const defaultStart = formatDate(twoYearsAgo);
+            const defaultEnd = formatDate(today);
+            const todayStr = defaultEnd;
+            
+            ['train-start', 'train-end', 'bt-start', 'bt-end'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.max = todayStr;
+            });
+            
+            document.getElementById('train-start').value = defaultStart;
+            document.getElementById('train-end').value = defaultEnd;
+            document.getElementById('bt-start').value = defaultStart;
+            document.getElementById('bt-end').value = defaultEnd;
+
+            // 修正 1: 進入時載入已訓練模型
+            loadModels();
+
+            // 修正 2: 啟用懸浮說明視窗 (Tooltip)
+            initTooltips();
+
+            const modelSelect = document.getElementById('model-select');
+            if (modelSelect) {
+                modelSelect.addEventListener('change', (e) => {
+                    currentModelId = e.target.value;
+                    if (currentUser) runBacktestData(currentUser);
+                });
+            }
+
+            const btRunBtn = document.getElementById('bt-run-btn');
+            if (btRunBtn) {
+                btRunBtn.addEventListener('click', () => {
+                    if (currentUser) runBacktestData(currentUser);
+                });
+            }
+        });
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            if (!currentUser) return;
+            const epochs = document.getElementById('epochs').value;
+            const btn = document.getElementById('start-btn');
+            const statusMsg = document.getElementById('status-msg');
+            
+            btn.disabled = true;
+            btn.innerText = '⏳ 訓練中...';
+            statusMsg.innerText = '建立連線與初始化環境...';
+
+            // Reset Chart
+            chartInstance.data.labels = [];
+            chartInstance.data.datasets[0].data = [];
+            chartInstance.update();
+
+            const paramsObj = {
+                year: currentUser.birthYear,
+                month: currentUser.birthMonth,
+                day: currentUser.birthDay,
+                hour: currentUser.birthHour,
+                userId: currentUser.id,
+                epochs: epochs,
+                batch: document.getElementById('batch').value,
+                lr: document.getElementById('lr').value,
+                gamma: document.getElementById('gamma').value,
+                decay: document.getElementById('decay').value,
+                baseModelId: selectedBaseModelId || ''
+            };
+            const ts = document.getElementById('train-start').value;
+            const te = document.getElementById('train-end').value;
+            if (ts) paramsObj.startDate = ts;
+            if (te) paramsObj.endDate = te;
+            
+            const queryParams = new URLSearchParams(paramsObj);
+            const eventSource = new EventSource(`/api/train?${queryParams.toString()}`);
+
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.status === 'fetching_market_data') {
+                    statusMsg.innerText = '下載歷史大盤數據...';
+                } else if (data.status === 'starting') {
+                    statusMsg.innerText = `開始訓練，共 ${data.epochs} 世代...`;
+                } else if (data.epoch) {
+                    // Progress tick
+                    document.getElementById('m-epoch').innerText = `${data.epoch} / ${data.totalEpochs}`;
+                    document.getElementById('m-portfolio').innerText = `$${Number(data.finalPortfolio).toLocaleString()}`;
+                    document.getElementById('m-epsilon').innerText = parseFloat(data.epsilon).toFixed(3);
+                    
+                    const roi = (((parseFloat(data.finalPortfolio) - 100000) / 100000) * 100).toFixed(2);
+                    const roiEl = document.getElementById('m-roi');
+                    roiEl.innerText = `${roi}%`;
+                    if (parseFloat(roi) >= 0) {
+                        roiEl.classList.remove('text-red-400');
+                        roiEl.classList.add('text-yellow-400');
+                    } else {
+                        roiEl.classList.remove('text-yellow-400');
+                        roiEl.classList.add('text-red-400');
+                    }
+
+                    // Update Chart
+                    chartInstance.data.labels.push(`Ep ${data.epoch}`);
+                    chartInstance.data.datasets[0].data.push(parseFloat(roi));
+                    chartInstance.update();
+                    
+                    statusMsg.innerText = `正在訓練 第 ${data.epoch} 世代...`;
+                } else if (data.status === 'completed') {
+                    statusMsg.innerText = '✅ 模型權重已保存綁定！';
+                    currentModelId = 'latest';
+                    loadModels();
+                } else if (data.status === 'done') {
+                    btn.disabled = false;
+                    btn.innerText = selectedBaseModelId ? '▶ 繼續訓練' : '▶ 重新訓練';
+                    eventSource.close();
+                } else if (data.error) {
+                    statusMsg.innerText = `❌ 錯誤: ${data.error}`;
+                    btn.disabled = false;
+                    btn.innerText = '▶ 開始訓練';
+                    eventSource.close();
+                }
+            };
+
+            eventSource.onerror = () => {
+                statusMsg.innerText = '❌ 連線中斷，請重試。';
+                btn.disabled = false;
+                btn.innerText = '▶ 開始訓練';
+                eventSource.close();
+            };
+        });
+    </script>
+</body>
+</html>

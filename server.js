@@ -18,6 +18,7 @@ const { matchStocks } = require('./src/stock_matcher'); // Stock Matcher Module
 const { recommendResonanceStocks } = require('./src/resonance_engine'); // Resonance Engine
 const { runBacktest } = require('./src/backtest'); // Backtest Module
 const { trainModel } = require('./src/rl_train'); // RL Training Module
+const { getFeatureCatalogForUI, parseFeatureConfig, getStateSize, getMarketDim } = require('./src/rl_features');
 const { registerUser, loginUser, authenticateToken, getUserProfile } = require('./src/auth');
 
 const app = express();
@@ -659,14 +660,20 @@ app.get('/api/backtest', async (req, res) => {
 
 
 // Phase 4: AI RL Training SSE Endpoint
+app.get('/api/train/features', (req, res) => {
+    res.json(getFeatureCatalogForUI());
+});
+
 app.get('/api/train', async (req, res) => {
     // 1. Establish SSE Connection
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
     
     // Simulate auth user parameters (in production get from req.user/token)
-    const { year, month, day, hour, epochs = 20, lr, gamma, decay, batch, baseModelId, startDate, endDate } = req.query;
+    const { year, month, day, hour, epochs = 20, lr, gamma, decay, batch, baseModelId, startDate, endDate, features } = req.query;
     
     const hyperParams = {
         learningRate: lr ? parseFloat(lr) : 0.001,
@@ -674,6 +681,14 @@ app.get('/api/train', async (req, res) => {
         epsilonDecay: decay ? parseFloat(decay) : 0.995,
         batchSize: batch ? parseInt(batch) : 32
     };
+    const featureConfig = parseFeatureConfig(features);
+    const stateSize = getStateSize(featureConfig);
+    const marketDim = getMarketDim(featureConfig);
+    const metaDim = stateSize - marketDim;
+    if (stateSize < 3 || metaDim < 1) {
+        res.write(`data: {"error": "至少需要一項命理特徵與一項市場特徵才能訓練雙塔模型"}\n\n`);
+        return res.end();
+    }
     if (!year || !month || !day || !hour) {
         res.write(`data: {"error": "Missing birth data"}\n\n`);
         return res.end();
@@ -696,14 +711,14 @@ app.get('/api/train', async (req, res) => {
         return res.end();
     }
     
-    res.write(`data: {"status": "starting", "epochs": ${epochs}}\n\n`);
+    res.write(`data: {"status": "starting", "epochs": ${epochs}, "stateSize": ${getStateSize(featureConfig)}}\n\n`);
 
     // 3. Start Training using imported trainModel
     try {
         await trainModel(userId, userBirth, marketData, parseInt(epochs), hyperParams, (progress) => {
-            // Callback to push progress
             res.write(`data: ${JSON.stringify(progress)}\n\n`);
-        }, baseModelId);
+            if (typeof res.flush === 'function') res.flush();
+        }, baseModelId, featureConfig);
         
         // Finalize
         res.write(`data: {"status": "done"}\n\n`);

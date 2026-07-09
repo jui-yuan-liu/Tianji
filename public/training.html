@@ -1,202 +1,432 @@
 <!DOCTYPE html>
-<html lang="zh-Hant" class="dark">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>天機 - AI 專屬模型訓練 (Phase 4)</title>
+    <title>天機 - AI 專屬模型訓練</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        background: '#0f172a',
-                        surface: '#1e293b',
-                    }
-                }
-            }
-        }
-    </script>
+    <link rel="stylesheet" href="/dashboard.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Noto Serif TC', serif; background-color: #0f172a; color: #f8fafc; }
-        #floating-tooltip { transition: opacity 0.2s; pointer-events: none; z-index: 9999; }
+        #floating-tooltip {
+            transition: opacity 0.2s;
+            pointer-events: none;
+            z-index: 9999;
+            max-width: min(320px, calc(100vw - 32px));
+        }
+        .param-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: help;
+            color: var(--text-muted);
+            border-bottom: 1px dashed rgba(148, 163, 184, 0.35);
+            padding-bottom: 1px;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .param-hint:hover { color: var(--text-primary); border-color: var(--cta); }
+        .param-hint-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--cta);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            flex-shrink: 0;
+        }
+        .tip-range {
+            display: block;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-subtle);
+            color: var(--primary);
+            font-size: 0.7rem;
+        }
+        .feature-panel { margin-top: 4px; }
+        .feature-category {
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: rgba(15, 23, 42, 0.35);
+        }
+        .feature-category-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 6px;
+        }
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            line-height: 1.4;
+            user-select: none;
+        }
+        .feature-item input { margin-top: 2px; accent-color: var(--cta); flex-shrink: 0; cursor: pointer; }
+        .feature-item .param-hint { cursor: help; border-bottom: none; padding-bottom: 0; }
+        .feature-item.required { opacity: 0.7; }
+        .feature-dim-badge {
+            font-size: 0.7rem;
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(139, 92, 246, 0.35);
+            background: rgba(139, 92, 246, 0.08);
+        }
+        .feature-actions { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+        .feature-actions button {
+            font-size: 0.7rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+        .feature-actions button:hover { color: var(--text-primary); border-color: var(--cta); }
+        .metric-toggles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .metric-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border-subtle);
+            background: rgba(15, 23, 42, 0.35);
+            cursor: pointer;
+            user-select: none;
+        }
+        .metric-toggle input { accent-color: var(--cta); }
+        .metric-toggle.active { border-color: rgba(139, 92, 246, 0.5); color: var(--text-primary); }
+        .metric-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .train-progress-bar {
+            height: 4px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.15);
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        .train-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+            transition: width 0.25s ease;
+        }
+        .train-chart-wrap {
+            position: relative;
+            width: 100%;
+            height: clamp(240px, 36vh, 400px);
+            max-height: 400px;
+            min-height: 240px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .train-chart-wrap canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .train-metrics-card {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .train-metrics-card .dash-kpi-grid {
+            max-height: none;
+        }
     </style>
 </head>
-<body class="bg-background text-slate-200 antialiased h-screen flex flex-col">
-
+<body>
     <script src="/app.js"></script>
     <script src="/nav.js"></script>
     <script src="/glossary.js"></script>
 
-    <!-- Floating Tooltip -->
-    <div id="floating-tooltip" class="hidden fixed bg-slate-800/95 backdrop-blur-md p-3 rounded-lg shadow-2xl border border-purple-500/50 w-64 text-xs leading-relaxed opacity-0"></div>
+    <div id="floating-tooltip" class="hidden fixed p-4 rounded-lg shadow-2xl text-xs leading-relaxed opacity-0" style="background:var(--bg-card);backdrop-filter:blur(12px);border:1px solid var(--border-accent)"></div>
 
-    <main class="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full">
-        <h1 class="text-3xl font-bold mb-6 text-purple-400">專屬 AI 交易代理人訓練</h1>
-        <p class="mb-6 text-slate-400">結合您的命盤（福德宮風險偏好、流日四化）與歷史大盤數據，透過深度強化學習 (DQN) 訓練專屬的量化交易模型。</p>
+    <div class="dash-content">
+        <p class="mb-4" style="color:var(--text-secondary);line-height:1.7">結合您的命盤（福德宮風險偏好、流日四化）與歷史大盤數據，透過深度強化學習 (DQN) 訓練專屬的量化交易模型。</p>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Control Panel -->
-            <div class="bg-surface p-6 rounded-xl border border-slate-700 shadow-xl col-span-1">
-                <h2 class="text-xl font-bold mb-4 text-white border-b border-slate-600 pb-2">訓練設定</h2>
-                <div class="space-y-4">
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-400 mb-1">訓練起點 (Start Date)</label>
-                            <input type="date" id="train-start" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-400 mb-1">訓練終點 (End Date)</label>
-                            <input type="date" id="train-end" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-400 mb-1" title="Epochs: 模型完整掃描一次歷史數據的次數。較多世代能提高擬合度，但過多(>200)可能導致過擬合。建議範位：20-100。">訓練世代 (Epochs)</label>
-                            <input type="number" id="epochs" value="50" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-400 mb-1" title="Batch Size: 每次更新權重所使用的樣本數量。較大值能穩定梯度，但需要更多內存；較小值(8-16)具備隨機性，有助於跳出局部最優解。建議範圍：16-64。">批次大小 (Batch Size)</label>
-                            <input type="number" id="batch" value="32" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-400 mb-1" title="Learning Rate: 控制 AI 每次調整權重的步長。太高(>0.01)會導致訓練不穩定甚至發散；太低(<0.0001)則收斂極慢。建議值：0.001。">學習率 (LR)</label>
-                            <input type="number" step="0.0001" id="lr" value="0.001" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-400 mb-1" title="Gamma: 衡量未來收益相對於當前收益的重視程度。接近 1 (如 0.99) 會使 AI 更有遠見，重視長期 ROI；接近 0 則會讓 AI 變得短視。建議範圍：0.90-0.99。">折扣因子 (Gamma)</label>
-                            <input type="number" step="0.01" id="gamma" value="0.95" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-400 mb-1" title="Epsilon Decay: 控制 AI 從隨機探索過渡到利用既有策略的速度。越接近 1 (如 0.999) 探索時間越長，有助於發現新策略；較低值(如 0.9) 則快速進入實戰應用。建議值：0.995。">探索衰減率 (Epsilon Decay)</label>
-                        <input type="number" step="0.001" id="decay" value="0.995" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-slate-400 mb-1">初始模擬資金 (NTD)</label>
-                        <input type="number" value="100000" disabled class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-slate-500 cursor-not-allowed">
-                    </div>
-                    <div id="user-info" class="text-sm text-yellow-400 mt-2">載入使用者命盤資訊中...</div>
-                    <button id="start-btn" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-4 rounded shadow-lg transition mt-4 disabled:opacity-50">
-                        ▶ 開始訓練
-                    </button>
-                    <button onclick="openGlossary()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 rounded shadow transition mt-2 flex items-center justify-center gap-2 text-sm">
-                        📖 命理與財經辭典
-                    </button>
-                    <div id="status-msg" class="text-sm text-slate-400 text-center"></div>
-                </div>
+        <div class="dash-card mb-6" id="model-foundation-panel">
+            <div class="dash-card-header">
+                <div class="dash-card-title">模型基礎 v3 · 可選特徵雙塔架構</div>
+                <span class="dash-badge tag" id="foundation-dim-badge">— 維狀態向量</span>
             </div>
-
-            <!-- Dashboard -->
-            <div class="col-span-1 lg:col-span-2 space-y-6">
-                <!-- Metrics -->
-                <div class="grid grid-cols-4 gap-4">
-                    <div class="bg-surface p-4 rounded-xl border border-slate-700 text-center">
-                        <div class="text-xs text-slate-400">當前世代</div>
-                        <div class="text-xl font-bold text-white" id="m-epoch">0 / 0</div>
-                    </div>
-                    <div class="bg-surface p-4 rounded-xl border border-slate-700 text-center">
-                        <div class="text-xs text-slate-400">最終資產淨值</div>
-                        <div class="text-xl font-bold text-green-400" id="m-portfolio">$0</div>
-                    </div>
-                    <div class="bg-surface p-4 rounded-xl border border-slate-700 text-center">
-                        <div class="text-xs text-slate-400">當前報酬率</div>
-                        <div class="text-xl font-bold text-yellow-400" id="m-roi">0.00%</div>
-                    </div>
-                    <div class="bg-surface p-4 rounded-xl border border-slate-700 text-center">
-                        <div class="text-xs text-slate-400">探索率 (ε)</div>
-                        <div class="text-xl font-bold text-blue-400" id="m-epsilon">1.000</div>
-                    </div>
+            <div class="dash-form-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+                <div class="dash-panel">
+                    <div class="text-xs font-bold mb-1" style="color:#93c5fd">股市塔 <span id="foundation-market-dim">—</span></div>
+                    <div class="text-xs" style="color:var(--text-muted);line-height:1.6">技術指標、量價數據、持倉狀態 — 可自由勾選</div>
                 </div>
-
-                <!-- Chart -->
-                <div class="bg-surface p-6 rounded-xl border border-slate-700 shadow-xl relative" style="height: 400px;">
-                    <canvas id="rewardChart"></canvas>
+                <div class="dash-panel">
+                    <div class="text-xs font-bold mb-1" style="color:#fcd34d">命理塔 <span id="foundation-meta-dim">—</span></div>
+                    <div class="text-xs" style="color:var(--text-muted);line-height:1.6">生辰命盤、流年流月流日、農曆與滿月週期</div>
                 </div>
-
-                <!-- Backtest Results -->
-                <div class="bg-surface p-6 rounded-xl border border-slate-700 shadow-xl">
-                    <h3 class="text-xl font-bold text-slate-200 mb-4 flex items-center border-b border-slate-700 pb-2 justify-between">
-                        <div class="flex items-center"><span class="w-1 h-6 bg-red-500 rounded mr-2"></span> 模型回測結果</div>
-                        <div class="flex items-center gap-2">
-                            <select id="model-select" class="bg-slate-800 border border-slate-600 text-sm text-slate-300 py-1 px-2 rounded outline-none focus:border-purple-500 transition">
-                                <option value="static">靜態命理策略</option>
-                            </select>
-                            <span id="bt-roi" class="px-3 py-1 rounded bg-slate-800 text-sm font-bold">尚未載入</span>
-                        </div>
-                    </h3>
-
-                    <div class="flex flex-col sm:flex-row gap-4 mb-4 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
-                        <div class="flex-1">
-                            <label class="block text-xs font-medium text-slate-400 mb-1">回測起點 (Start Date)</label>
-                            <input type="date" id="bt-start" class="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-white text-sm focus:border-purple-500 outline-none transition">
-                        </div>
-                        <div class="flex-1">
-                            <label class="block text-xs font-medium text-slate-400 mb-1">回測終點 (End Date)</label>
-                            <input type="date" id="bt-end" class="w-full bg-slate-800 border border-slate-600 rounded p-1.5 text-white text-sm focus:border-purple-500 outline-none transition">
-                        </div>
-                        <div class="flex items-end">
-                            <button id="bt-run-btn" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 px-4 rounded text-sm shadow transition border border-purple-500">執行回測</button>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4 mb-6">
-                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-600 text-center">
-                            <div class="text-xs text-slate-400 mb-1">初始資金</div>
-                            <div class="text-xl font-bold text-white" id="bt-init">$100,000</div>
-                        </div>
-                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-600 text-center">
-                            <div class="text-xs text-slate-400 mb-1">最終淨值</div>
-                            <div class="text-xl font-bold text-yellow-400" id="bt-final">--</div>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-3 gap-2 mb-6">
-                        <div class="bg-slate-800 p-2 rounded border border-slate-600 text-center">
-                            <div class="text-[10px] text-slate-400 mb-1">勝率 (Win Rate)</div>
-                            <div class="text-md font-bold text-green-400" id="bt-winrate">--</div>
-                        </div>
-                        <div class="bg-slate-800 p-2 rounded border border-slate-600 text-center">
-                            <div class="text-[10px] text-slate-400 mb-1">最大回撤 (MDD)</div>
-                            <div class="text-md font-bold text-red-400" id="bt-mdd">--</div>
-                        </div>
-                        <div class="bg-slate-800 p-2 rounded border border-slate-600 text-center">
-                            <div class="text-[10px] text-slate-400 mb-1">超額報酬 (Alpha)</div>
-                            <div class="text-md font-bold text-purple-400" id="bt-alpha">--</div>
-                        </div>
-                    </div>
-                    
-                    <div class="text-sm text-slate-300 font-bold mb-2 flex justify-between">
-                        <span>歷史交易訊號 (近期)</span>
-                        <span id="bt-model-type" class="text-xs text-purple-400 font-bold border border-purple-500 px-1 rounded">載入中...</span>
-                    </div>
-                    <div id="bt-chart-container" class="w-full h-[300px] rounded-lg overflow-hidden border border-slate-600"></div>
+                <div class="dash-panel">
+                    <div class="text-xs font-bold mb-1" style="color:#c4b5fd">運勢層級</div>
+                    <div class="text-xs" style="color:var(--text-muted);line-height:1.6">大運、流年、流月、流日 — 各層<strong>財帛宮</strong>的四化（祿權科忌）與主星象，可獨立開關</div>
+                </div>
+                <div class="dash-panel">
+                    <div class="text-xs font-bold mb-1" style="color:#4ade80">決策對齊</div>
+                    <div class="text-xs" style="color:var(--text-muted);line-height:1.6">建議保留流日財帛宮；與靜態回測策略以化祿/化忌與正財星對齊</div>
+                </div>
+                <div class="dash-panel">
+                    <div class="text-xs font-bold mb-1" style="color:#fb923c">獎勵機制</div>
+                    <div class="text-xs" style="color:var(--text-muted);line-height:1.6">閒置現金每日按 <strong>2% 年化通膨</strong>折損購買力；觀望未成交另有不交易懲罰，避免模型長期空手</div>
                 </div>
             </div>
         </div>
 
-        <div class="bg-surface p-6 rounded-xl border border-slate-700 shadow-xl mt-6">
-            <h2 class="text-xl font-bold mb-4 text-white border-b border-slate-600 pb-2 flex justify-between">
-                <span>已訓練模型清單 (Models History)</span>
-                <span id="fine-tune-status" class="text-sm text-yellow-400 font-bold hidden bg-slate-800 px-3 py-1 rounded"></span>
-            </h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-slate-300 text-sm">
+        <div class="dash-layout dash-layout-1-2-1">
+            <div class="dash-card">
+                <div class="dash-card-header">
+                    <div class="dash-card-title">訓練設定</div>
+                </div>
+                <div class="space-y-4">
+
+                    <div class="dash-form-grid">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 param-hint"
+                                data-tip-title="訓練起點 (Start Date)"
+                                data-tip-body="歷史數據的開始日期。AI 從這一天起學習大盤走勢與您的命盤特徵（流日四化、福德宮風險偏好等）。區間太短可能無法涵蓋完整市場週期。"
+                                data-tip-range="建議：至少 1 年以上歷史數據">訓練起點<span class="param-hint-icon">?</span></label>
+                            <input type="date" id="train-start" class="dash-input w-full text-sm" style="width:100%">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 param-hint"
+                                data-tip-title="訓練終點 (End Date)"
+                                data-tip-body="歷史數據的結束日期，通常設為今天或最近一個交易日。訓練區間越長，模型見過的市場情境越多，但每個世代的運算時間也會增加。"
+                                data-tip-range="建議：設為最新可用交易日">訓練終點<span class="param-hint-icon">?</span></label>
+                            <input type="date" id="train-end" class="dash-input w-full text-sm" style="width:100%">
+                        </div>
+                    </div>
+                    <div class="dash-form-grid">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 param-hint"
+                                data-tip-title="訓練世代 (Epochs)"
+                                data-tip-body="模型完整掃描一次歷史數據的次數。每個世代都會根據模擬交易的報酬調整神經網路權重。世代過少學不到足夠規律；過多（>200）可能過擬合，只記住歷史噪音。"
+                                data-tip-range="建議範圍：20 – 100">訓練世代<span class="param-hint-icon">?</span></label>
+                            <input type="number" id="epochs" value="50" class="dash-input w-full text-sm" style="width:100%">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 param-hint"
+                                data-tip-title="批次大小 (Batch Size)"
+                                data-tip-body="每次更新權重時從經驗回放池抽取的樣本數量。較大批次讓梯度估計更穩定，但需要更多記憶體；較小批次帶有隨機性，有助於跳出局部最優解。"
+                                data-tip-range="建議範圍：16 – 64">批次大小<span class="param-hint-icon">?</span></label>
+                            <input type="number" id="batch" value="32" class="dash-input w-full text-sm" style="width:100%">
+                        </div>
+                    </div>
+                    <div class="dash-form-grid">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 param-hint"
+                                data-tip-title="學習率 (Learning Rate)"
+                                data-tip-body="控制 AI 每次調整神經網路權重的步長。學習率太高（>0.01）會導致訓練不穩定甚至發散；太低（<0.0001）則收斂極慢，難以在有限世代內學到有效策略。"
+                                data-tip-range="建議值：0.001">學習率 (LR)<span class="param-hint-icon">?</span></label>
+                            <input type="number" step="0.0001" id="lr" value="0.001" class="dash-input w-full text-sm" style="width:100%">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 param-hint"
+                                data-tip-title="折扣因子 (Gamma, γ)"
+                                data-tip-body="衡量未來收益相對於當前收益的重視程度，範圍 0–1。接近 1（如 0.99）使 AI 更有遠見、重視長期 ROI；接近 0 則變得短視，只在意眼前報酬。"
+                                data-tip-range="建議範圍：0.90 – 0.99">折扣因子 (Gamma)<span class="param-hint-icon">?</span></label>
+                            <input type="number" step="0.01" id="gamma" value="0.95" class="dash-input w-full text-sm" style="width:100%">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 param-hint"
+                            data-tip-title="探索衰減率 (Epsilon Decay)"
+                            data-tip-body="控制 AI 從「隨機探索」（嘗試新動作）過渡到「利用已知策略」（沿用高報酬動作）的速度。衰減率越接近 1，探索期越長，有助發現新策略；較低值則快速進入實戰模式，但可能錯過更好的策略。"
+                            data-tip-range="建議值：0.995">探索衰減率<span class="param-hint-icon">?</span></label>
+                        <input type="number" step="0.001" id="decay" value="0.995" class="dash-input w-full text-sm" style="width:100%">
+                    </div>
+
+                    <div class="feature-panel">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-sm font-medium param-hint"
+                                data-tip-title="訓練特徵選擇"
+                                data-tip-body="勾選要納入狀態向量的特徵模組。變更特徵會改變神經網路輸入維度，與舊模型不相容，需重新訓練。建議至少保留價格動能與流日財帛宮。"
+                                data-tip-range="持倉狀態為必選，無法關閉">訓練特徵<span class="param-hint-icon">?</span></label>
+                            <span class="feature-dim-badge" id="feature-dim-badge">— 維</span>
+                        </div>
+                        <div class="feature-actions">
+                            <button type="button" id="feature-select-all">全選</button>
+                            <button type="button" id="feature-select-default">預設</button>
+                            <button type="button" id="feature-select-minimal">精簡（技術+流日）</button>
+                        </div>
+                        <div id="feature-categories"></div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1 param-hint"
+                            data-tip-title="初始模擬資金 (NTD)"
+                            data-tip-body="訓練與回測時使用的虛擬本金，用於計算 ROI、資產淨值曲線與最大回撤。所有模型的績效指標都以此金額為基準，方便橫向比較不同訓練結果。"
+                            data-tip-range="目前固定：NT$ 100,000">初始模擬資金 (NTD)<span class="param-hint-icon">?</span></label>
+                        <input type="number" value="100000" disabled class="dash-input w-full text-sm" style="width:100%;opacity:0.5;cursor:not-allowed">
+                    </div>
+                    <div id="user-info" class="text-sm text-gold mt-2">載入使用者命盤資訊中...</div>
+                    <button id="start-btn" class="dash-btn dash-btn-primary w-full mt-4 disabled:opacity-50" style="width:100%">
+                        ▶ 開始訓練
+                    </button>
+                    <button onclick="openGlossary()" class="dash-btn dash-btn-secondary w-full mt-2 text-sm" style="width:100%">
+                        命理辭典
+                    </button>
+                    <div id="status-msg" class="text-sm text-center" style="color:var(--text-muted)"></div>
+                </div>
+            </div>
+
+            <div class="dash-stack min-w-0">
+                <div class="dash-kpi-grid" style="margin-bottom:0">
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">當前世代</div>
+                        <div class="dash-kpi-value sm" id="m-epoch">0 / 0</div>
+                    </div>
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">訓練進度</div>
+                        <div class="dash-kpi-value sm" id="m-progress">0%</div>
+                    </div>
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">資產淨值</div>
+                        <div class="dash-kpi-value sm" id="m-portfolio" style="color:#4ade80">$0</div>
+                    </div>
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">報酬率</div>
+                        <div class="dash-kpi-value sm" id="m-roi" style="color:var(--primary)">0.00%</div>
+                    </div>
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">探索率 ε</div>
+                        <div class="dash-kpi-value sm" id="m-epsilon">1.000</div>
+                    </div>
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">累積獎勵</div>
+                        <div class="dash-kpi-value sm" id="m-reward">0.0000</div>
+                    </div>
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">訓練損失</div>
+                        <div class="dash-kpi-value sm" id="m-loss">—</div>
+                    </div>
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">最大回撤</div>
+                        <div class="dash-kpi-value sm" id="m-mdd" style="color:#f87171">0.00%</div>
+                    </div>
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">持倉比例</div>
+                        <div class="dash-kpi-value sm" id="m-exposure">0%</div>
+                    </div>
+                    <div class="dash-kpi">
+                        <div class="dash-kpi-label">記憶庫 / 交易</div>
+                        <div class="dash-kpi-value sm" id="m-memory">0 / 0</div>
+                    </div>
+                </div>
+
+                <div class="dash-card train-metrics-card">
+                    <div class="dash-card-header" style="margin-bottom:8px">
+                        <div class="dash-card-title">訓練即時曲線</div>
+                        <span class="dash-badge tag" id="chart-point-count">0 點</span>
+                    </div>
+                    <div class="train-progress-bar"><div class="train-progress-fill" id="train-progress-fill"></div></div>
+                    <div class="metric-toggles" id="metric-toggles"></div>
+                    <div class="train-chart-wrap" id="train-chart-wrap">
+                        <canvas id="rewardChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title">回測結果</div>
+                        <div class="flex items-center gap-2">
+                            <select id="model-select" class="dash-select dash-btn-sm">
+                                <option value="static">靜態命理策略</option>
+                            </select>
+                            <span id="bt-roi" class="dash-badge hold">尚未載入</span>
+                        </div>
+                    </div>
+
+                    <div class="dash-flex-end dash-panel mb-4">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium mb-1" style="color:var(--text-muted)">回測起點</label>
+                            <input type="date" id="bt-start" class="dash-input w-full text-sm" style="width:100%">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium mb-1" style="color:var(--text-muted)">回測終點</label>
+                            <input type="date" id="bt-end" class="dash-input w-full text-sm" style="width:100%">
+                        </div>
+                        <div class="flex items-end">
+                            <button id="bt-run-btn" class="dash-btn dash-btn-primary dash-btn-sm">執行回測</button>
+                        </div>
+                    </div>
+                    
+                    <div class="dash-kpi-grid mb-6" style="margin-bottom:24px;grid-template-columns:repeat(2,minmax(0,1fr))">
+                        <div class="dash-kpi">
+                            <div class="dash-kpi-label">初始資金</div>
+                            <div class="dash-kpi-value sm" id="bt-init">$100,000</div>
+                        </div>
+                        <div class="dash-kpi">
+                            <div class="dash-kpi-label">最終淨值</div>
+                            <div class="dash-kpi-value sm" id="bt-final" style="color:var(--primary)">--</div>
+                        </div>
+                    </div>
+
+                    <div class="dash-kpi-grid mb-6" style="margin-bottom:24px">
+                        <div class="dash-kpi" style="--kpi-color:#22c55e">
+                            <div class="dash-kpi-label">勝率</div>
+                            <div class="dash-kpi-value sm" id="bt-winrate" style="color:#4ade80">--</div>
+                        </div>
+                        <div class="dash-kpi" style="--kpi-color:#ef4444">
+                            <div class="dash-kpi-label">最大回撤</div>
+                            <div class="dash-kpi-value sm" id="bt-mdd" style="color:#f87171">--</div>
+                        </div>
+                        <div class="dash-kpi" style="--kpi-color:#8b5cf6">
+                            <div class="dash-kpi-label">超額報酬</div>
+                            <div class="dash-kpi-value sm" id="bt-alpha" style="color:#c4b5fd">--</div>
+                        </div>
+                    </div>
+
+                    <div class="text-sm font-bold mb-2 flex justify-between" style="color:var(--text-secondary)">
+                        <span>歷史交易訊號 (近期)</span>
+                        <span id="bt-model-type" class="dash-badge tag text-xs">載入中...</span>
+                    </div>
+                    <div id="bt-chart-container" class="dash-chart-box"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dash-card mt-6">
+            <div class="dash-card-header">
+                <div class="dash-card-title">模型清單</div>
+                <span id="fine-tune-status" class="dash-badge tag hidden"></span>
+            </div>
+            <div class="dash-table-wrap">
+                <table class="dash-table">
                     <thead>
-                        <tr class="border-b border-slate-700 text-slate-400">
-                            <th class="py-2">模型名稱</th>
-                            <th class="py-2">訓練世代</th>
-                            <th class="py-2">回測 ROI</th>
-                            <th class="py-2">建立時間</th>
-                            <th class="py-2 text-right">操作</th>
+                        <tr>
+                            <th>模型名稱</th>
+                            <th>訓練世代</th>
+                            <th>回測 ROI</th>
+                            <th>建立時間</th>
+                            <th style="text-align:right">操作</th>
                         </tr>
                     </thead>
                     <tbody id="model-list-body">
@@ -205,7 +435,7 @@
                 </table>
             </div>
         </div>
-    </main>
+    </div>
 
     <script>
 
@@ -245,12 +475,15 @@
 
                     // Initialize lightweight chart if not exist
                     if (!btChart) {
-                        btChart = LightweightCharts.createChart(document.getElementById('bt-chart-container'), {
-                            layout: { background: { type: 'solid', color: '#0f172a' }, textColor: '#cbd5e1' },
-                            grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+                        const btEl = document.getElementById('bt-chart-container');
+                        btChart = LightweightCharts.createChart(btEl, {
+                            layout: { background: { type: 'solid', color: '#0f172a' }, textColor: '#64748b' },
+                            grid: { vertLines: { color: 'rgba(248,250,252,0.04)' }, horzLines: { color: 'rgba(248,250,252,0.04)' } },
                             crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-                            timeScale: { borderColor: '#334155' },
-                            rightPriceScale: { borderColor: '#334155' }
+                            timeScale: { borderColor: 'rgba(248,250,252,0.06)' },
+                            rightPriceScale: { borderColor: 'rgba(248,250,252,0.06)' },
+                            width: btEl.clientWidth,
+                            height: btEl.clientHeight,
                         });
                         btCandleSeries = btChart.addCandlestickSeries({
                             upColor: '#ef4444', downColor: '#10b981', borderUpColor: '#ef4444', borderDownColor: '#10b981', wickUpColor: '#ef4444', wickDownColor: '#10b981'
@@ -386,7 +619,11 @@
                 if (model.hyperParams.learningRate) document.getElementById('lr').value = model.hyperParams.learningRate;
                 if (model.hyperParams.gamma) document.getElementById('gamma').value = model.hyperParams.gamma;
                 if (model.hyperParams.epsilonDecay) document.getElementById('decay').value = model.hyperParams.epsilonDecay;
-                document.getElementById('epochs').value = 20; // Suggest a smaller epoch for fine-tuning
+                document.getElementById('epochs').value = 20;
+            }
+            if (model && model.enabledFeatures) {
+                const keys = Object.entries(model.enabledFeatures).filter(([, v]) => v).map(([k]) => k);
+                setFeatureSelection(keys);
             }
 
             const ft = document.getElementById('fine-tune-status');
@@ -410,81 +647,432 @@
 
         let currentUser = null;
         let chartInstance = null;
+        let featureCatalog = null;
+        let activeTrainEventSource = null;
+        let lastTrainChartSize = { w: 0, h: 0 };
+        let resizeChartTimer = null;
+
+        const TRAIN_METRICS = {
+            roi: { label: '報酬率 ROI %', color: 'rgb(168, 85, 247)', axis: 'y', default: true },
+            maxDrawdown: { label: '最大回撤 %', color: 'rgb(248, 113, 113)', axis: 'y', default: false },
+            totalReward: { label: '累積獎勵', color: 'rgb(59, 130, 246)', axis: 'y1', default: false },
+            epsilon: { label: '探索率 ε', color: 'rgb(250, 204, 21)', axis: 'y1', default: false },
+            loss: { label: '訓練損失', color: 'rgb(251, 146, 60)', axis: 'y1', default: false },
+            exposure: { label: '持倉比例', color: 'rgb(52, 211, 153)', axis: 'y1', default: false },
+        };
+
+        const enabledTrainMetrics = new Set(
+            Object.entries(TRAIN_METRICS).filter(([, m]) => m.default).map(([k]) => k)
+        );
+
+        function renderMetricToggles() {
+            const container = document.getElementById('metric-toggles');
+            if (!container) return;
+            container.innerHTML = Object.entries(TRAIN_METRICS).map(([key, meta]) => `
+                <label class="metric-toggle ${enabledTrainMetrics.has(key) ? 'active' : ''}">
+                    <input type="checkbox" class="metric-toggle-input" value="${key}" ${enabledTrainMetrics.has(key) ? 'checked' : ''}>
+                    <span class="metric-dot" style="background:${meta.color}"></span>
+                    <span>${meta.label}</span>
+                </label>
+            `).join('');
+            container.querySelectorAll('.metric-toggle-input').forEach(input => {
+                input.addEventListener('change', () => {
+                    const key = input.value;
+                    const label = input.closest('.metric-toggle');
+                    if (input.checked) {
+                        enabledTrainMetrics.add(key);
+                        label?.classList.add('active');
+                    } else {
+                        if (enabledTrainMetrics.size <= 1) {
+                            input.checked = true;
+                            return;
+                        }
+                        enabledTrainMetrics.delete(key);
+                        label?.classList.remove('active');
+                    }
+                    syncChartDatasets();
+                    if (chartInstance) chartInstance.update('none');
+                });
+            });
+        }
+
+        function colorWithAlpha(rgb, alpha) {
+            const parts = String(rgb).match(/\d+/g);
+            if (!parts || parts.length < 3) return rgb;
+            return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+        }
+
+        function buildChartDatasets() {
+            return Array.from(enabledTrainMetrics).map(key => {
+                const meta = TRAIN_METRICS[key];
+                return {
+                    label: meta.label,
+                    data: [],
+                    borderColor: meta.color,
+                    backgroundColor: colorWithAlpha(meta.color, key === 'roi' ? 0.15 : 0),
+                    borderWidth: key === 'roi' ? 2.5 : 1.5,
+                    pointRadius: 0,
+                    pointHitRadius: 8,
+                    tension: 0.25,
+                    fill: key === 'roi',
+                    yAxisID: meta.axis,
+                    metricKey: key,
+                };
+            });
+        }
+
+        function syncChartDatasets() {
+            if (!chartInstance) return;
+            const labels = chartInstance.data.labels;
+            const oldDatasets = chartInstance.data.datasets;
+            const valueMap = {};
+            oldDatasets.forEach(ds => {
+                if (ds.metricKey) valueMap[ds.metricKey] = [...ds.data];
+            });
+            chartInstance.data.datasets = buildChartDatasets().map(ds => ({
+                ...ds,
+                data: valueMap[ds.metricKey] || new Array(labels.length).fill(null),
+            }));
+        }
+
+        function resetTrainingChart() {
+            if (!chartInstance) return;
+            chartInstance.data.labels = [];
+            chartInstance.data.datasets = buildChartDatasets();
+            chartInstance.update('none');
+            const countEl = document.getElementById('chart-point-count');
+            if (countEl) countEl.textContent = '0 點';
+            const fill = document.getElementById('train-progress-fill');
+            if (fill) fill.style.width = '0%';
+        }
+
+        function appendTrainingPoint(data) {
+            if (!chartInstance) return;
+            const label = `E${data.epoch}·${data.progress ?? 0}%`;
+            chartInstance.data.labels.push(label);
+            chartInstance.data.datasets.forEach(ds => {
+                const key = ds.metricKey;
+                let value = data[key];
+                if (value == null && key === 'totalReward') value = data.totalReward;
+                ds.data.push(value != null ? Number(value) : null);
+            });
+            const maxPoints = 2000;
+            if (chartInstance.data.labels.length > maxPoints) {
+                chartInstance.data.labels.shift();
+                chartInstance.data.datasets.forEach(ds => ds.data.shift());
+            }
+            chartInstance.update('none');
+            const countEl = document.getElementById('chart-point-count');
+            if (countEl) countEl.textContent = `${chartInstance.data.labels.length} 點`;
+        }
+
+        function updateTrainingKpis(data) {
+            if (data.epoch != null && data.totalEpochs != null) {
+                document.getElementById('m-epoch').innerText = `${data.epoch} / ${data.totalEpochs}`;
+            }
+            if (data.progress != null) {
+                document.getElementById('m-progress').innerText = `${data.progress}%`;
+                const fill = document.getElementById('train-progress-fill');
+                if (fill) {
+                    const overall = data.totalEpochs
+                        ? (((data.epoch - 1) + (data.progress / 100)) / data.totalEpochs) * 100
+                        : data.progress;
+                    fill.style.width = `${Math.min(100, Math.max(0, overall))}%`;
+                }
+            }
+            if (data.portfolio != null) {
+                document.getElementById('m-portfolio').innerText = `$${Number(data.portfolio).toLocaleString()}`;
+            }
+            if (data.roi != null) {
+                const roiEl = document.getElementById('m-roi');
+                const roi = Number(data.roi);
+                roiEl.innerText = `${roi.toFixed(2)}%`;
+                roiEl.style.color = roi >= 0 ? '#facc15' : '#f87171';
+            }
+            if (data.epsilon != null) {
+                document.getElementById('m-epsilon').innerText = Number(data.epsilon).toFixed(3);
+            }
+            if (data.totalReward != null) {
+                document.getElementById('m-reward').innerText = Number(data.totalReward).toFixed(4);
+            }
+            if (data.loss != null) {
+                document.getElementById('m-loss').innerText = Number(data.loss).toFixed(4);
+            }
+            if (data.maxDrawdown != null) {
+                document.getElementById('m-mdd').innerText = `${Number(data.maxDrawdown).toFixed(2)}%`;
+            }
+            if (data.exposure != null) {
+                document.getElementById('m-exposure').innerText = `${(Number(data.exposure) * 100).toFixed(1)}%`;
+            }
+            if (data.memorySize != null || data.trades != null) {
+                document.getElementById('m-memory').innerText = `${data.memorySize ?? 0} / ${data.trades ?? 0}`;
+            }
+        }
+
+        function handleTrainingProgress(data) {
+            if (data.type === 'tick' || data.type === 'epoch' || data.epoch) {
+                updateTrainingKpis(data);
+                appendTrainingPoint(data);
+                if (data.type === 'epoch') {
+                    document.getElementById('status-msg').innerText = `完成第 ${data.epoch} 世代，損失 ${data.loss ?? '—'}`;
+                } else if (data.type === 'tick') {
+                    document.getElementById('status-msg').innerText = `訓練中 E${data.epoch} · ${data.progress}% · ROI ${data.roi}%`;
+                }
+            }
+        }
+
+        const MARKET_FEATURE_KEYS = new Set(['price_momentum', 'moving_average', 'volatility', 'rsi', 'volume_change', 'volume_level', 'price_volume_corr', 'portfolio']);
+        const MINIMAL_FEATURE_KEYS = new Set(['price_momentum', 'moving_average', 'volatility', 'volume_change', 'portfolio', 'daily_wealth']);
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function getSelectedFeatureKeys() {
+            return Array.from(document.querySelectorAll('.feature-checkbox:checked')).map(cb => cb.value);
+        }
+
+        function setFeatureSelection(keys) {
+            const keySet = new Set(keys);
+            document.querySelectorAll('.feature-checkbox').forEach(cb => {
+                if (cb.disabled) {
+                    cb.checked = true;
+                    return;
+                }
+                cb.checked = keySet.has(cb.value);
+            });
+            updateFeatureDimBadge();
+        }
+
+        function updateFeatureDimBadge() {
+            let total = 0;
+            let market = 0;
+            let meta = 0;
+            document.querySelectorAll('.feature-checkbox:checked').forEach(cb => {
+                const size = parseInt(cb.dataset.size || '0', 10);
+                total += size;
+                if (MARKET_FEATURE_KEYS.has(cb.value)) market += size;
+                else meta += size;
+            });
+            const badge = document.getElementById('feature-dim-badge');
+            if (badge) badge.textContent = total > 0 ? `${total} 維` : '— 維';
+            const foundationBadge = document.getElementById('foundation-dim-badge');
+            if (foundationBadge) foundationBadge.textContent = total > 0 ? `${total} 維狀態向量` : '— 維狀態向量';
+            const marketEl = document.getElementById('foundation-market-dim');
+            if (marketEl) marketEl.textContent = total > 0 ? `(${market}維)` : '(—)';
+            const metaEl = document.getElementById('foundation-meta-dim');
+            if (metaEl) metaEl.textContent = total > 0 ? `(${meta}維)` : '(—)';
+        }
+
+        function renderFeatureCategories(catalog) {
+            const container = document.getElementById('feature-categories');
+            if (!container) return;
+            container.innerHTML = catalog.categories.map(cat => `
+                <div class="feature-category">
+                    <div class="feature-category-title">
+                        <span>${escapeHtml(cat.label)}</span>
+                        <span style="font-weight:400;color:var(--text-muted)">${cat.features.reduce((s, f) => s + f.size, 0)} 維</span>
+                    </div>
+                    <div class="feature-grid">
+                        ${cat.features.map(f => `
+                            <label class="feature-item ${f.required ? 'required' : ''}">
+                                <input type="checkbox" class="feature-checkbox" value="${escapeHtml(f.key)}" data-size="${f.size}"
+                                    ${catalog.defaults[f.key] ? 'checked' : ''} ${f.required ? 'checked disabled' : ''}>
+                                <span class="param-hint"
+                                    data-tip-title="${escapeHtml(f.label)}"
+                                    data-tip-body="${escapeHtml(f.hint || '')}"
+                                    data-tip-range="${f.size} 維${f.required ? ' · 必選' : ''}">${escapeHtml(f.label)}<span class="param-hint-icon">?</span></span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+            container.querySelectorAll('.feature-checkbox:not([disabled])').forEach(cb => {
+                cb.addEventListener('change', updateFeatureDimBadge);
+            });
+            updateFeatureDimBadge();
+            initTooltips();
+        }
+
+        async function loadFeatureCatalog() {
+            const sources = ['/api/train/features', '/feature-catalog.json'];
+            for (const url of sources) {
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) continue;
+                    featureCatalog = await res.json();
+                    if (featureCatalog?.categories?.length) {
+                        renderFeatureCategories(featureCatalog);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('Feature catalog fetch failed:', url, e);
+                }
+            }
+            const container = document.getElementById('feature-categories');
+            if (container) {
+                container.innerHTML = '<p class="text-xs" style="color:#f87171">無法載入特徵目錄，請重新整理或重啟伺服器。</p>';
+            }
+        }
+
+        function initFeatureControls() {
+            document.getElementById('feature-select-all')?.addEventListener('click', () => {
+                if (!featureCatalog) return;
+                setFeatureSelection(featureCatalog.order);
+            });
+            document.getElementById('feature-select-default')?.addEventListener('click', () => {
+                if (!featureCatalog) return;
+                setFeatureSelection(Object.entries(featureCatalog.defaults).filter(([, v]) => v).map(([k]) => k));
+            });
+            document.getElementById('feature-select-minimal')?.addEventListener('click', () => {
+                setFeatureSelection([...MINIMAL_FEATURE_KEYS]);
+            });
+        }
+
+        function validateFeatureSelection() {
+            const keys = getSelectedFeatureKeys();
+            if (keys.length === 0) {
+                alert('請至少選擇一項訓練特徵。');
+                return false;
+            }
+            const hasMeta = keys.some(k => !MARKET_FEATURE_KEYS.has(k) && k !== 'portfolio');
+            if (!hasMeta) {
+                alert('雙塔架構需要至少一項命理特徵（如流日財帛、生辰命盤等）。');
+                return false;
+            }
+            return true;
+        }
         
         // Init Tooltips logic
-        function initTooltips() {
+        function buildTipHtml(title, body, range) {
+            let html = `<div style="font-weight:600;color:#c4b5fd;margin-bottom:6px;font-size:0.8rem">${title}</div>`;
+            html += `<div style="color:var(--text-secondary);line-height:1.65">${body}</div>`;
+            if (range) html += `<span class="tip-range">${range}</span>`;
+            return html;
+        }
+
+        function positionTooltip(tooltip, e) {
+            let x = e.clientX + 16;
+            let y = e.clientY + 16;
+            const rect = tooltip.getBoundingClientRect();
+            if (x + rect.width > window.innerWidth - 12) x = e.clientX - rect.width - 16;
+            if (y + rect.height > window.innerHeight - 12) y = e.clientY - rect.height - 16;
+            if (x < 8) x = 8;
+            if (y < 8) y = 8;
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        }
+
+        function bindTooltip(el, getContent) {
+            if (el.dataset.tipBound) return;
+            el.dataset.tipBound = '1';
             const tooltip = document.getElementById('floating-tooltip');
-            document.querySelectorAll('[title]').forEach(el => {
+
+            el.addEventListener('mouseenter', (e) => {
+                const content = getContent(el);
+                if (!content) return;
+                tooltip.innerHTML = content;
+                tooltip.classList.remove('hidden');
+                requestAnimationFrame(() => tooltip.classList.remove('opacity-0'));
+            });
+
+            el.addEventListener('mousemove', (e) => positionTooltip(tooltip, e));
+
+            el.addEventListener('mouseleave', () => {
+                tooltip.classList.add('opacity-0');
+                setTimeout(() => {
+                    if (tooltip.classList.contains('opacity-0')) tooltip.classList.add('hidden');
+                }, 200);
+            });
+        }
+
+        function initTooltips() {
+            document.querySelectorAll('[data-tip-title]').forEach(el => {
+                bindTooltip(el, (target) => buildTipHtml(
+                    target.dataset.tipTitle,
+                    target.dataset.tipBody || '',
+                    target.dataset.tipRange || ''
+                ));
+            });
+
+            document.querySelectorAll('[title]:not([data-tip-bound])').forEach(el => {
                 const title = el.getAttribute('title');
-                if(!title) return;
-
-                el.addEventListener('mouseenter', (e) => {
-                    tooltip.innerHTML = `<div class="font-bold text-purple-300 mb-1 border-b border-slate-700 pb-1">說明</div><div>${title}</div>`;
-                    tooltip.classList.remove('hidden');
-                    setTimeout(() => tooltip.classList.remove('opacity-0'), 10);
-                });
-
-                el.addEventListener('mousemove', (e) => {
-                    let x = e.clientX + 15;
-                    let y = e.clientY + 15;
-                    const rect = tooltip.getBoundingClientRect();
-                    if (x + rect.width > window.innerWidth) x = e.clientX - rect.width - 15;
-                    if (y + rect.height > window.innerHeight) y = e.clientY - rect.height - 15;
-                    tooltip.style.left = x + 'px';
-                    tooltip.style.top = y + 'px';
-                });
-
-                el.addEventListener('mouseleave', () => {
-                    tooltip.classList.add('opacity-0');
-                    setTimeout(() => { if(tooltip.classList.contains('opacity-0')) tooltip.classList.add('hidden'); }, 200);
-                });
-                
-                // Hide native title but keep it in dataset
+                if (!title) return;
                 el.dataset.title = title;
                 el.removeAttribute('title');
+                bindTooltip(el, () => buildTipHtml('說明', el.dataset.title, ''));
             });
         }
 
         // Init Chart
+        renderMetricToggles();
+        const chartWrap = document.getElementById('train-chart-wrap');
         const ctx = document.getElementById('rewardChart').getContext('2d');
         chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: [],
-                datasets: [{
-                    label: '訓練世代報酬率 (ROI)',
-                    data: [],
-                    borderColor: 'rgb(168, 85, 247)', // purple-500
-                    backgroundColor: 'rgba(168, 85, 247, 0.2)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.3
-                }]
+                datasets: buildChartDatasets(),
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
+                resizeDelay: 200,
+                interaction: { mode: 'index', intersect: false },
                 scales: {
                     x: {
-                        grid: { color: 'rgba(255,255,255,0.1)' },
-                        ticks: { color: '#94a3b8' }
+                        grid: { color: 'rgba(255,255,255,0.06)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            maxTicksLimit: 12,
+                            maxRotation: 0,
+                        },
                     },
                     y: {
-                        grid: { color: 'rgba(255,255,255,0.1)' },
-                        ticks: { color: '#94a3b8' }
-                    }
+                        type: 'linear',
+                        position: 'left',
+                        title: { display: true, text: 'ROI / 回撤 %', color: '#94a3b8', font: { size: 11 } },
+                        grid: { color: 'rgba(255,255,255,0.08)' },
+                        ticks: { color: '#94a3b8' },
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'ε / 損失 / 持倉 / 獎勵', color: '#94a3b8', font: { size: 11 } },
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: '#94a3b8' },
+                    },
                 },
                 plugins: {
-                    legend: { labels: { color: '#fff' } }
-                }
-            }
+                    legend: {
+                        display: true,
+                        labels: { color: '#e2e8f0', boxWidth: 10, font: { size: 11 } },
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title(items) {
+                                return items[0]?.label || '';
+                            },
+                        },
+                    },
+                },
+            },
         });
 
         window.addEventListener('DOMContentLoaded', async () => {
+            initFeatureControls();
+            await loadFeatureCatalog();
+
             currentUser = await fetchMe();
             if (!currentUser) {
                 document.getElementById('user-info').innerText = '請先登入以載入命盤！';
                 document.getElementById('start-btn').disabled = true;
+                initTooltips();
                 return;
             }
             document.getElementById('user-info').innerText = 
@@ -534,6 +1122,7 @@
 
         document.getElementById('start-btn').addEventListener('click', () => {
             if (!currentUser) return;
+            if (!validateFeatureSelection()) return;
             const epochs = document.getElementById('epochs').value;
             const btn = document.getElementById('start-btn');
             const statusMsg = document.getElementById('status-msg');
@@ -542,10 +1131,16 @@
             btn.innerText = '⏳ 訓練中...';
             statusMsg.innerText = '建立連線與初始化環境...';
 
-            // Reset Chart
-            chartInstance.data.labels = [];
-            chartInstance.data.datasets[0].data = [];
-            chartInstance.update();
+            if (activeTrainEventSource) {
+                activeTrainEventSource.close();
+                activeTrainEventSource = null;
+            }
+            resetTrainingChart();
+            updateTrainingKpis({
+                epoch: 0, totalEpochs: epochs, progress: 0, portfolio: 100000, roi: 0,
+                epsilon: 1, totalReward: 0, maxDrawdown: 0, exposure: 0, memorySize: 0, trades: 0,
+            });
+            document.getElementById('m-loss').innerText = '—';
 
             const paramsObj = {
                 year: currentUser.birthYear,
@@ -564,9 +1159,12 @@
             const te = document.getElementById('train-end').value;
             if (ts) paramsObj.startDate = ts;
             if (te) paramsObj.endDate = te;
+            const selectedFeatures = getSelectedFeatureKeys();
+            if (selectedFeatures.length > 0) paramsObj.features = selectedFeatures.join(',');
             
             const queryParams = new URLSearchParams(paramsObj);
             const eventSource = new EventSource(`/api/train?${queryParams.toString()}`);
+            activeTrainEventSource = eventSource;
 
             eventSource.onmessage = (event) => {
                 const data = JSON.parse(event.data);
@@ -574,30 +1172,12 @@
                 if (data.status === 'fetching_market_data') {
                     statusMsg.innerText = '下載歷史大盤數據...';
                 } else if (data.status === 'starting') {
-                    statusMsg.innerText = `開始訓練，共 ${data.epochs} 世代...`;
+                    statusMsg.innerText = `開始訓練，共 ${data.epochs} 世代 · ${data.stateSize || '—'} 維特徵`;
+                    document.getElementById('m-epoch').innerText = `0 / ${data.epochs}`;
+                } else if (data.type === 'tick' || data.type === 'epoch') {
+                    handleTrainingProgress(data);
                 } else if (data.epoch) {
-                    // Progress tick
-                    document.getElementById('m-epoch').innerText = `${data.epoch} / ${data.totalEpochs}`;
-                    document.getElementById('m-portfolio').innerText = `$${Number(data.finalPortfolio).toLocaleString()}`;
-                    document.getElementById('m-epsilon').innerText = parseFloat(data.epsilon).toFixed(3);
-                    
-                    const roi = (((parseFloat(data.finalPortfolio) - 100000) / 100000) * 100).toFixed(2);
-                    const roiEl = document.getElementById('m-roi');
-                    roiEl.innerText = `${roi}%`;
-                    if (parseFloat(roi) >= 0) {
-                        roiEl.classList.remove('text-red-400');
-                        roiEl.classList.add('text-yellow-400');
-                    } else {
-                        roiEl.classList.remove('text-yellow-400');
-                        roiEl.classList.add('text-red-400');
-                    }
-
-                    // Update Chart
-                    chartInstance.data.labels.push(`Ep ${data.epoch}`);
-                    chartInstance.data.datasets[0].data.push(parseFloat(roi));
-                    chartInstance.update();
-                    
-                    statusMsg.innerText = `正在訓練 第 ${data.epoch} 世代...`;
+                    handleTrainingProgress({ ...data, type: 'epoch' });
                 } else if (data.status === 'completed') {
                     statusMsg.innerText = '✅ 模型權重已保存綁定！';
                     currentModelId = 'latest';
@@ -605,11 +1185,13 @@
                 } else if (data.status === 'done') {
                     btn.disabled = false;
                     btn.innerText = selectedBaseModelId ? '▶ 繼續訓練' : '▶ 重新訓練';
+                    activeTrainEventSource = null;
                     eventSource.close();
                 } else if (data.error) {
                     statusMsg.innerText = `❌ 錯誤: ${data.error}`;
                     btn.disabled = false;
                     btn.innerText = '▶ 開始訓練';
+                    activeTrainEventSource = null;
                     eventSource.close();
                 }
             };
@@ -618,9 +1200,33 @@
                 statusMsg.innerText = '❌ 連線中斷，請重試。';
                 btn.disabled = false;
                 btn.innerText = '▶ 開始訓練';
+                activeTrainEventSource = null;
                 eventSource.close();
             };
         });
+
+        if (chartWrap) {
+            lastTrainChartSize = { w: chartWrap.clientWidth, h: chartWrap.clientHeight };
+        }
+
+        window.resizeDashboardCharts = function () {
+            if (resizeChartTimer) clearTimeout(resizeChartTimer);
+            resizeChartTimer = setTimeout(() => {
+                const wrap = document.getElementById('train-chart-wrap');
+                if (chartInstance && wrap) {
+                    const w = wrap.clientWidth;
+                    const h = wrap.clientHeight;
+                    if (w > 0 && h > 0 && (w !== lastTrainChartSize.w || h !== lastTrainChartSize.h)) {
+                        lastTrainChartSize = { w, h };
+                        chartInstance.resize();
+                    }
+                }
+                const el = document.getElementById('bt-chart-container');
+                if (btChart && el) {
+                    btChart.applyOptions({ width: el.clientWidth, height: el.clientHeight });
+                }
+            }, 150);
+        };
     </script>
 </body>
 </html>

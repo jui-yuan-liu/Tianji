@@ -8,6 +8,7 @@ const path = require('path');
 const tf = require('@tensorflow/tfjs');
 const TianjiEnv = require('./rl_env');
 const DqnAgent = require('./rl_agent');
+const { getExplainabilityFactors, resolveFeatureConfig, getMarketDim } = require('./rl_features');
 
 async function runBacktest(marketData, birthYear, birthMonth, birthDay, birthHour, userId, modelId) {
     // Basic setup for user
@@ -49,14 +50,26 @@ async function runBacktest(marketData, birthYear, birthMonth, birthDay, birthHou
     let env = null;
     let agent = null;
     let currentState = null;
+    let modelMeta = null;
+
+    if (hasAIModel) {
+        const userDir = path.resolve(__dirname, '../models', `user_${userId}`);
+        const indexFile = path.join(userDir, 'models.json');
+        if (fs.existsSync(indexFile)) {
+            const indexData = JSON.parse(fs.readFileSync(indexFile, 'utf8'));
+            modelMeta = indexData.find(m => path.basename(modelDir) === m.id) || indexData[indexData.length - 1];
+        }
+    }
+
+    const featureConfig = resolveFeatureConfig(modelMeta);
+    const marketDim = modelMeta?.marketDim ?? getMarketDim(featureConfig);
 
     if (hasAIModel) {
         console.log(`[Backtest] AI Model found for user_${userId}. Using RL Agent for inference.`);
-        env = new TianjiEnv(sortedData, userBirth);
-        // Correcting dimensions to match new Phase 7 environment
+        env = new TianjiEnv(sortedData, userBirth, featureConfig);
         const stateSize = env.getStateSize();
         const actionSize = env.getActionSize();
-        agent = new DqnAgent(stateSize, actionSize);
+        agent = new DqnAgent(stateSize, actionSize, { marketDim });
         
         await agent.loadWeights(modelDir);
         agent.epsilon = 0; 
@@ -100,25 +113,8 @@ async function runBacktest(marketData, birthYear, birthMonth, birthDay, birthHou
             const action = env.actionMap[actionIdx] || { type: 'HOLD', ratio: 0 };
             signal = action.type;
             
-            // Explainability Factors (based on the new 61-dim state)
-            // Picking key dimensions for visualization: Price(0), MA(1), Capital(2), Shares(3), AnnPos(4), MonPos(5), DayPos(6)
-            const f1 = (currentState[0] - 0.5) * 2;
-            const f2 = (currentState[1]) * 10; // Price change is usually small
-            const f3 = (currentState[2] - 0.5) * 2; // Cash
-            const f4 = (currentState[3] - 0.5) * 2; // Shares
-            const f5 = (currentState[4] - 0.5) * 2; // Annual
-            const f6 = (currentState[5] - 0.5) * 2; // Monthly
-            const f7 = (currentState[6] - 0.5) * 2; // Daily
-
-            factors = [
-                { name: '價格動能 (Price Norm)', value: Math.max(-1, Math.min(1, f1)) },
-                { name: '短期波幅 (Momentum)', value: Math.max(-1, Math.min(1, f2)) },
-                { name: '剩餘資金比 (Cash Level)', value: f3 },
-                { name: '持倉占比 (Exposure)', value: f4 },
-                { name: '流年位能 (Annual Pos)', value: f5 },
-                { name: '流月位能 (Monthly Pos)', value: f6 },
-                { name: '流日位能 (Daily Pos)', value: f7 }
-            ];
+            // Explainability from v2 feature schema
+            factors = getExplainabilityFactors(currentState, featureConfig);
 
             const ratioPct = (action.ratio * 100).toFixed(0) + "%";
             if (signal === 'BUY') {

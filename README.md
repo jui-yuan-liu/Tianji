@@ -32,7 +32,7 @@
 *   **Frontend:** 原生 HTML / JS / Tailwind CSS (CDN)
 *   **Charts:** Lightweight Charts (v4.1.1)
 *   **Astrology Lib:** 自研 `src/ziwei_*` 模組 (結合 `lunar-javascript`)
-*   **ML Engine:** TensorFlow.js (Deep Q-Learning)
+*   **ML Engine:** TensorFlow.js — 雙塔融合 DQN v3（可選特徵模組 + 動態維度）
 
 ## 目前已實作功能 (Current State)
 *   [x] 完整十二宮位排盤引擎 (`ziwei_core.js`, `ziwei_stars.js`, `ziwei_periods.js`)
@@ -51,7 +51,7 @@
 *   [x] **Phase 4: 命盤專屬 AI 強化學習 (RL) 訓練系統**
     *   針對每位使用者的生辰八字，訓練專屬的交易代理人 (Trading Agent)，讓 AI 學習命理與市場關聯。
     *   實作 RL 環境與特徵工程，定義 State Space（整合金融與命理數據）、Action Space 與 Reward Function。
-    *   開發前端 AI 訓練儀表板 (`training.html`)，即時視覺化顯示訓練進度與累積獎勵曲線。
+    *   開發前端 AI 訓練儀表板 (`training.html`)，支援可選特徵、即時多指標曲線與訓練進度 KPI。
     *   實作模型持久化與權重儲存機制，將每位會員的專屬 AI 模型綁定儲存。
     *   將回測結果面板整合至 AI 訓練頁面，使用者能在訓練完成後立即查看專屬模型的績效指標 (ROI, MDD, Alpha 等) 與歷史交易訊號。
 *   [x] **Phase 5: AI 驅動之進階回測與視覺化 (AI-Driven Backtesting)**
@@ -67,6 +67,15 @@
     *   **高維度特徵工程**：特徵空間從 9 維大幅擴展至 61 維。
     *   **資產感知系統**：在 State Space 中新增「當前持倉股數」與「剩餘現金量」的正規化數值。
     *   **精細化動作空間**：將動作擴展為 11 個，支援不同比例的進出場操作。
+*   [x] **Phase 7.1: AI 訓練平台 v3 升級 (2026-07-09)**
+    *   **可選特徵模組 (Schema v3)**：`src/rl_features.js` 重構為 15 個可獨立開關的特徵群組（技術指標、量價、流年流月流日、滿月週期等），動態組裝 16–58 維狀態向量。
+    *   **雙塔融合 DQN v3**：`src/rl_agent.js` 依選取特徵自動計算 `marketDim` / `metaDim`，股市塔與命理塔分離編碼後融合決策。
+    *   **訓練頁特徵選擇 UI**：`training.html` 提供分類勾選、全選/預設/精簡快捷鍵、即時維度預覽；API `GET /api/train/features` + 靜態備援 `public/feature-catalog.json`。
+    *   **即時訓練監控**：SSE 推送世代內 tick（約每世代 50 點），支援 ROI、累積獎勵、ε、訓練損失、最大回撤、持倉比例等多指標切換曲線與 10 項 KPI。
+    *   **財帛宮對齊**：流年/流月/流日/大運皆以財帛宮四化與主星為核心，與靜態回測策略一致。
+    *   **獎勵機制強化**：閒置現金按 2% 年化通膨每日折損購買力；觀望未成交另有不交易懲罰，避免模型長期空手。
+    *   **模型 Meta 持久化**：儲存 `enabledFeatures`、`rewardConfig`、`marketDim`、`featureSchemaVersion: 3`。
+    *   **儀表板 UX**：滿版 RWD 佈局、參數懸浮說明 (tooltip)、修復 Chart.js 無限擴張導致頁面當機問題。
 *   [ ] **Phase 8: 台股命盤共振推薦系統 (Stock-User Resonance)**
     *   **股票生辰採集**：抓取台股上市公司設立日期作為「出生時間」，擴充 `tw_stocks` 資料庫欄位。
     *   **股票命盤預處理**：批次計算所有股票的先天命盤特徵（主星、五行局）並持久化。
@@ -75,10 +84,64 @@
 
 ---
 
+## 開發日誌 (Changelog)
+
+### 2026-07-09 — AI 訓練平台 v3 與儀表板強化
+
+#### 後端 / RL 核心
+| 項目 | 說明 |
+|------|------|
+| `src/rl_features.js` | Feature Schema **v3**：15 個模組化特徵（價格動能、MA、波動率、RSI、量價三項、持倉、生辰、大運/流年/流月/流日財帛、農曆、滿月週期） |
+| `src/rl_agent.js` | 雙塔 DQN v3，動態 `marketDim`；`replay()` 回傳訓練損失供即時監控 |
+| `src/rl_env.js` | 支援 `featureConfig`；**通膨折損**（現金 × 2%/252）與**不交易懲罰**；`step()` 回傳 `inflationLoss`、`traded` 等 info |
+| `src/rl_train.js` | 世代內 tick 推送、模型 meta 寫入 `enabledFeatures` / `rewardConfig` |
+| `src/backtest.js` | 依模型 meta 的 `enabledFeatures` 還原特徵配置，舊 51 維模型自動相容 |
+| `server.js` | 新增 `GET /api/train/features`；訓練 API 接受 `features` 參數；SSE 防緩衝即時 flush |
+
+#### 前端
+| 項目 | 說明 |
+|------|------|
+| `public/training.html` | 可選特徵 UI、即時多指標曲線（6 條可切換）、10 項 KPI、訓練進度條、獎勵機制說明面板 |
+| `public/feature-catalog.json` | 特徵目錄靜態備援（API 不可用時自動 fallback） |
+| `public/dashboard.css` / `nav.js` | 滿版儀表板設計系統、手機側欄 RWD、參數 tooltip |
+
+#### 問題修復
+- 特徵勾選無反應：舊版 server 未載入 `/api/train/features`（404）→ 已加重啟與靜態備援
+- 特徵 UI 僅在登入後初始化 → 改為頁面載入即渲染
+- Chart.js 在 `min-height` 容器內無限 resize → 鎖定 `.train-chart-wrap` 固定高度
+
+#### 預設配置參考
+- 預設特徵：**51 維**（與舊 v2 相容）
+- 全開特徵：**58 維**（含 RSI、量價擴充、滿月週期）
+- 通膨：年化 **2%**，252 交易日折算
+- 不交易懲罰：每日 **0.003%** × 現金佔比（佔初始資金）
+
+---
+
 ## 未來開發計畫 (Next Steps for Next Agents)
 未來的開發者請依序參考以下計畫推進專案，本專案將從靜態命理回測工具，正式升級為「基於個人命理特徵的 AI 量化交易訓練平台」：
 
-### 1. Phase 8: 多市場、資產類別與極短線支援 (Multi-Asset & Short-term)
+### 1. Phase 8: 台股命盤共振推薦系統 (Stock-User Resonance) — 進行中
+完成人股契合度評分，並將共振特徵接入 RL 訓練可選模組。
+*   **Step 1: 股票命盤資料完善**
+    *   補齊 `tw_stocks` 設立日期，完善 `stock_features` 預處理批次任務。
+    *   驗證 `src/resonance_engine.js`、`src/stock_matcher.js` 評分邏輯與單元測試。
+*   **Step 2: 推薦 API 與前端整合**
+    *   完成 `/api/recommend-stocks` 並於首頁或排盤室展示 Top 10 契合標的與原因。
+*   **Step 3: 接入 RL 特徵（可選）**
+    *   在 `rl_features.js` 新增 `resonance` 特徵群組，讓 AI 訓練可選用個股共振分數。
+
+### 2. Phase 8.1: AI 訓練進階調校
+延續今日 v3 架構，提升訓練品質與可用性。
+*   **Step 1: 超參數與獎勵可調**
+    *   訓練頁開放通膨率、不交易懲罰係數、手續費率等 `rewardConfig` 設定。
+    *   微調時強制校驗特徵維度與基底模型一致，避免靜默跳過權重載入。
+*   **Step 2: 訓練 API 認證**
+    *   `/api/train` 接入 JWT，取代 `userId` query 參數。
+*   **Step 3: 個股/multi-asset 訓練**
+    *   支援選擇標的（非僅 TAIEX），並與 Phase 9 市場擴充銜接。
+
+### 3. Phase 9: 多市場、資產類別與極短線支援 (Multi-Asset & Short-term)
 橫向擴展平台支援的金融商品與交易頻率。
 *   **Step 1: 擴充市場數據源**
     *   修改 `/api/market-data`，增加對美股 (S&P 500, NASDAQ) 及加密貨幣 (BTC, ETH) 的即時與歷史數據抓取能力。
@@ -87,7 +150,7 @@
     *   針對 24 小時交易的市場 (如加密貨幣)，導入「流時盤」(每兩小時運勢變化) 作為更細微的時間維度特徵。
     *   優化強化學習環境，訓練出支援高頻交易或當沖操作的極短線專屬 AI 模型。
 
-### 2. Phase 9: 自動化推播與通知系統 (Automated Notifications)
+### 4. Phase 10: 自動化推播與通知系統 (Automated Notifications)
 將 AI 模型應用於每日實戰，提供即時的投資決策輔助。
 *   **Step 1: 建立背景排程 (Cron Jobs)**
     *   實作背景定時任務 (如 Node.js 的 `node-cron`)，每日台股開盤前 (例如 08:30) 自動執行。

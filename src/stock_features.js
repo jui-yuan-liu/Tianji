@@ -1,5 +1,5 @@
 const db = require('./db');
-const { calculateLifePalace, getFullPalaceMapping } = require('./ziwei_core');
+const { calculateLifePalace, getFullPalaceMapping, hourToBranchIndex } = require('./ziwei_core');
 const { getFiveElementBureau, getZiWeiStarPosition, getTianFuStarPosition, getAllMajorStars } = require('./ziwei_stars');
 const { Solar } = require('lunar-javascript');
 
@@ -37,7 +37,7 @@ async function generateStockFeatures() {
                 const lunar = solar.getLunar();
                 const lMonth = lunar.getMonth();
                 const lDay = lunar.getDay();
-                const lHour = setupHour || 12; // Default to Noon
+                const lHour = hourToBranchIndex(setupHour ?? 12);
                 const yearGan = lunar.getYearGan();
                 const yearGanIdx = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"].indexOf(yearGan);
 

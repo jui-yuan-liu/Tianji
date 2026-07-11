@@ -9,7 +9,7 @@ const { Solar, Lunar } = require('lunar-javascript');
 // Import Core Logic
 // getFullPalaceMapping is missing in require because I edited the file but not updated require here fully yet.
 // Wait, I just edited the require line in previous step. Let's use it.
-const { PALACES, calculateLifePalace, calculateWealthPalace, calculateFortunePalace, getInvestmentStrategy, getFullPalaceMapping } = require('./src/ziwei_core');
+const { PALACES, calculateLifePalace, calculateWealthPalace, calculateFortunePalace, getInvestmentStrategy, getFullPalaceMapping, hourToBranchIndex } = require('./src/ziwei_core');
 const { getFiveElementBureau, getZiWeiStarPosition, getTianFuStarPosition, getLifePalaceStemBranch, getAllMajorStars } = require('./src/ziwei_stars');
 const { getAnnualTransformations, getAnnualLifePalace } = require('./src/ziwei_annual');
 const { getDecadeLifePalace, getMonthlyLifePalace, getDailyLifePalace, getTimeTransformations } = require('./src/ziwei_periods');
@@ -159,7 +159,7 @@ app.post('/api/calculate', (req, res) => {
         const lunar = solar.getLunar();
         const lunarMonth = lunar.getMonth();
         const lunarDay = lunar.getDay();
-        const birthHour = parseInt(hour);
+        const hourBranchIdx = hourToBranchIndex(hour);
         const yearGan = lunar.getYearGan();
         const yearGanIndex = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"].indexOf(yearGan);
 
@@ -170,7 +170,7 @@ app.post('/api/calculate', (req, res) => {
         const targetLunarDay = targetLunar.getDay();
 
         // 2. Natal Chart
-        const lifePalaceIdx = calculateLifePalace(lunarMonth, birthHour);
+        const lifePalaceIdx = calculateLifePalace(lunarMonth, hourBranchIdx);
         // Get Full Palace Names Mapping
         const palaceMapping = getFullPalaceMapping ? getFullPalaceMapping(lifePalaceIdx) : {};
         if (!getFullPalaceMapping) {
@@ -206,7 +206,7 @@ app.post('/api/calculate', (req, res) => {
 
         // Monthly
         const monthlyTrans = getTimeTransformations("甲"); // Simplified
-        const monthlyLifePos = getMonthlyLifePalace(annualLifePos, targetLunarMonth, birthHour, 6); // Uses target lunar month
+        const monthlyLifePos = getMonthlyLifePalace(annualLifePos, lunarMonth, hourBranchIdx, targetLunarMonth);
 
         // Daily
         const dailyTrans = getTimeTransformations(targetLunar.getDayGan()); // Uses target day gan
@@ -514,7 +514,8 @@ function calculateDailyFortune(dateStr, bYear, bMonth, bDay, bHour) {
     // 2. Birth Chart Basic Info
     const birthSolar = Solar.fromYmd(bYear, bMonth, bDay);
     const birthLunar = birthSolar.getLunar();
-    const lifePalaceIdx = calculateLifePalace(birthLunar.getMonth(), bHour);
+    const hourBranchIdx = hourToBranchIndex(bHour);
+    const lifePalaceIdx = calculateLifePalace(birthLunar.getMonth(), hourBranchIdx);
     const yearGanIndex = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"].indexOf(birthLunar.getYearGan());
     const fiveElementBureau = getFiveElementBureau(yearGanIndex, lifePalaceIdx);
 
@@ -522,7 +523,7 @@ function calculateDailyFortune(dateStr, bYear, bMonth, bDay, bHour) {
     const currentYear = targetDate.getFullYear();
     const targetYearBranchIdx = (currentYear - 4) % 12;
     const annualLifePos = getAnnualLifePalace(targetYearBranchIdx);
-    const monthlyLifePos = getMonthlyLifePalace(annualLifePos, lunar.getMonth(), bHour, 6);
+    const monthlyLifePos = getMonthlyLifePalace(annualLifePos, birthLunar.getMonth(), hourBranchIdx, lunarMonth);
     const dailyLifePos = getDailyLifePalace(monthlyLifePos, lunar.getDay());
     const dailyWealthPos = calculateWealthPalace(dailyLifePos);
 

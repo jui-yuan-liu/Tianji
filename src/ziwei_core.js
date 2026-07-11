@@ -12,12 +12,30 @@ const PALACE_NAMES = [
   "官祿", "田宅", "福德", "父母"
 ];
 
-// Simplified Star Placement
-function calculateLifePalace(lunarMonth, lunarHour) {
-  // Demo Logic: (Month + Hour) % 12
-  // Real logic needs complex table lookups based on school.
-  // For demo, we use a simple hash to distribute across 12 palaces.
-  return (lunarMonth + lunarHour) % 12;
+function fixIndex(index, cycle = 12) {
+  let i = index;
+  while (i < 0) i += cycle;
+  return i % cycle;
+}
+
+/** 西元 24 小時制 → 時辰地支索引（子=0 … 亥=11；23–24 點為晚子時=12） */
+function hourToBranchIndex(hour24) {
+  const h = ((parseInt(hour24, 10) % 24) + 24) % 24;
+  if (h === 23) return 12;
+  return Math.floor((h + 1) / 2) % 12;
+}
+
+/**
+ * 安命宮：寅起正月，順數至生月，逆數生時為命宮。
+ * @param {number} lunarMonth 農曆月（1–12）
+ * @param {number} hourBranchIdx 時辰地支索引（子=0 … 亥=11）
+ * @returns {number} 命宮所在地支索引（子=0 … 亥=11）
+ */
+function calculateLifePalace(lunarMonth, hourBranchIdx) {
+  const branchHour = hourBranchIdx >= 12 ? 0 : hourBranchIdx;
+  const monthIndex = lunarMonth - 1;
+  const soulIndexFromYin = fixIndex(monthIndex - branchHour);
+  return fixIndex(soulIndexFromYin + 2);
 }
 
 function calculateWealthPalace(lifePalaceIndex) {
@@ -169,6 +187,8 @@ function getInvestmentStrategy(wealthStarStr, fortuneStarStr) {
 
 module.exports = {
   PALACES: PALACE_NAMES,
+  fixIndex,
+  hourToBranchIndex,
   calculateLifePalace,
   calculateWealthPalace,
   calculateFortunePalace,

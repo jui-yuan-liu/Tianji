@@ -1,4 +1,4 @@
-const { calculateLifePalace, calculateWealthPalace } = require('./ziwei_core');
+const { calculateLifePalace, calculateWealthPalace, hourToBranchIndex } = require('./ziwei_core');
 const { getFiveElementBureau, getZiWeiStarPosition, getTianFuStarPosition, getAllMajorStars } = require('./ziwei_stars');
 const { getAnnualLifePalace, getAnnualTransformations } = require('./ziwei_annual');
 const { getMonthlyLifePalace, getDailyLifePalace, getTimeTransformations } = require('./ziwei_periods');
@@ -81,7 +81,7 @@ async function runBacktest(marketData, birthYear, birthMonth, birthDay, birthHou
     // Static Setup
     const birthSolar = Solar.fromYmd(bYear, bMonth, bDay);
     const birthLunar = birthSolar.getLunar();
-    const bHourBranchIdx = Math.floor(((bHour + 1) % 24) / 2); // 0=Zi, 1=Chou...
+    const bHourBranchIdx = hourToBranchIndex(bHour);
     const lifePalaceIdx = calculateLifePalace(birthLunar.getMonth(), bHourBranchIdx);
     const yearGanIndex = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"].indexOf(birthLunar.getYearGan());
     const fiveElementBureau = getFiveElementBureau(yearGanIndex, lifePalaceIdx);

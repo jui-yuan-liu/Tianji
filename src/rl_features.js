@@ -1,7 +1,7 @@
 /**
  * Tianji RL Feature Schema v3 — 可選特徵模組
  */
-const { calculateLifePalace, calculateWealthPalace } = require('./ziwei_core');
+const { calculateLifePalace, calculateWealthPalace, hourToBranchIndex } = require('./ziwei_core');
 const { getFiveElementBureau, getZiWeiStarPosition, getTianFuStarPosition, getAllMajorStars } = require('./ziwei_stars');
 const { getAnnualLifePalace, getAnnualTransformations } = require('./ziwei_annual');
 const { getDecadeLifePalace, getMonthlyLifePalace, getDailyLifePalace, getTimeTransformations } = require('./ziwei_periods');
@@ -305,7 +305,7 @@ function buildNatalContext(userBirth) {
     const bMonth = parseInt(userBirth.month, 10);
     const bDay = parseInt(userBirth.day, 10);
     const bHour = parseInt(userBirth.hour, 10);
-    const hourBranchIdx = Math.floor(((bHour + 1) % 24) / 2);
+    const hourBranchIdx = hourToBranchIndex(bHour);
 
     const birthSolar = Solar.fromYmd(bYear, bMonth, bDay);
     const birthLunar = birthSolar.getLunar();

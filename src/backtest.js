@@ -1,7 +1,6 @@
-const { calculateLifePalace, calculateWealthPalace, hourToBranchIndex } = require('./ziwei_core');
+const { calculateLifePalace, calculateWealthPalace, hourToBranchIndex, getStarPlacementLunarDay } = require('./ziwei_core');
 const { getFiveElementBureau, getZiWeiStarPosition, getTianFuStarPosition, getAllMajorStars } = require('./ziwei_stars');
-const { getAnnualLifePalace, getAnnualTransformations } = require('./ziwei_annual');
-const { getMonthlyLifePalace, getDailyLifePalace, getTimeTransformations } = require('./ziwei_periods');
+const { resolveHoroscope } = require('./ziwei_horoscope');
 const { Solar, Lunar } = require('lunar-javascript');
 const fs = require('fs');
 const path = require('path');
@@ -85,7 +84,7 @@ async function runBacktest(marketData, birthYear, birthMonth, birthDay, birthHou
     const lifePalaceIdx = calculateLifePalace(birthLunar.getMonth(), bHourBranchIdx);
     const yearGanIndex = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"].indexOf(birthLunar.getYearGan());
     const fiveElementBureau = getFiveElementBureau(yearGanIndex, lifePalaceIdx);
-    const ziWeiPos = getZiWeiStarPosition(fiveElementBureau, birthLunar.getDay());
+    const ziWeiPos = getZiWeiStarPosition(fiveElementBureau, getStarPlacementLunarDay(birthSolar, bHourBranchIdx));
     const tianFuPos = getTianFuStarPosition(ziWeiPos);
     const allStars = getAllMajorStars(ziWeiPos, tianFuPos);
 
@@ -131,18 +130,16 @@ async function runBacktest(marketData, birthYear, birthMonth, birthDay, birthHou
             
         } else {
             // Static Inference (Backwards compatibility)
-            const currentYear = targetDate.getFullYear();
-            const targetYearBranchIdx = (currentYear - 4) % 12;
-            const targetYearStemIdx = (currentYear - 4) % 10;
-            const annualStem = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"][targetYearStemIdx];
-            
-            const annualLifePos = getAnnualLifePalace(targetYearBranchIdx);
-            const monthlyLifePos = getMonthlyLifePalace(annualLifePos, birthLunar.getMonth(), bHourBranchIdx, lunar.getMonth());
-            const dailyLifePos = getDailyLifePalace(monthlyLifePos, lunar.getDay());
+            const horoscope = resolveHoroscope({
+                birthSolar,
+                birthHourBranchIdx: bHourBranchIdx,
+                lifePalaceIdx,
+                fiveElementBureau,
+                birthYearStemIndex: yearGanIndex,
+                targetSolar: Solar.fromYmd(targetDate.getFullYear(), targetDate.getMonth() + 1, targetDate.getDate()),
+            });
+            const { annualTrans, dailyTrans, dailyLifePos } = horoscope;
             const dailyWealthPos = calculateWealthPalace(dailyLifePos);
-
-            const annualTrans = getAnnualTransformations(annualStem);
-            const dailyTrans = getTimeTransformations(lunar.getDayGan());
             const dailyWealthStars = allStars.filter(s => s.position === dailyWealthPos).map(s => s.name);
             
             factors = [

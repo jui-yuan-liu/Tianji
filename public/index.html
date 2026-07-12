@@ -165,6 +165,11 @@
             fetch(`/api/daily-fortune?date=${today}&birthYear=${user.birthYear}&birthMonth=${user.birthMonth}&birthDay=${user.birthDay}&birthHour=${user.birthHour}`)
                 .then(r => r.json()).then(data => {
                     document.getElementById('daily-loading').classList.add('hidden');
+                    if (!data.user?.advice) {
+                        document.getElementById('daily-content').classList.remove('hidden');
+                        document.getElementById('d-desc').innerText = data.error || '無法載入今日運勢，請稍後再試。';
+                        return;
+                    }
                     document.getElementById('daily-content').classList.remove('hidden');
 
                     const adv = data.user.advice;
@@ -214,6 +219,11 @@
                             }
                         }
                     });
+                }).catch(err => {
+                    console.error('Daily fortune fetch failed', err);
+                    document.getElementById('daily-loading').classList.add('hidden');
+                    document.getElementById('daily-content').classList.remove('hidden');
+                    document.getElementById('d-desc').innerText = '無法載入今日運勢，請稍後再試。';
                 });
         }
 

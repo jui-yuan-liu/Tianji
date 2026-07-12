@@ -1,5 +1,5 @@
 const db = require('./db');
-const { calculateLifePalace, getFullPalaceMapping, hourToBranchIndex } = require('./ziwei_core');
+const { calculateLifePalace, getFullPalaceMapping, hourToBranchIndex, getStarPlacementLunarDay } = require('./ziwei_core');
 const { getFiveElementBureau, getZiWeiStarPosition, getTianFuStarPosition, getAllMajorStars } = require('./ziwei_stars');
 const { Solar } = require('lunar-javascript');
 
@@ -44,7 +44,7 @@ async function generateStockFeatures() {
                 // 2. Calculate Chart
                 const lifeIdx = calculateLifePalace(lMonth, lHour);
                 const bureau = getFiveElementBureau(yearGanIdx, lifeIdx);
-                const ziWeiPos = getZiWeiStarPosition(bureau, lDay);
+                const ziWeiPos = getZiWeiStarPosition(bureau, getStarPlacementLunarDay(solar, lHour));
                 const tianFuPos = getTianFuStarPosition(ziWeiPos);
                 const allStars = getAllMajorStars(ziWeiPos, tianFuPos);
                 

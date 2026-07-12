@@ -114,6 +114,7 @@ function getAllMajorStars(ziWeiPos, tianFuPos) {
 }
 
 module.exports = {
+  getTigerStartStem,
   getFiveElementBureau,
   getZiWeiStarPosition,
   getTianFuStarPosition,

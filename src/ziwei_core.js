@@ -18,11 +18,32 @@ function fixIndex(index, cycle = 12) {
   return i % cycle;
 }
 
-/** 西元 24 小時制 → 時辰地支索引（子=0 … 亥=11；23–24 點為晚子時=12） */
+/** 西元 24 小時制 → 時辰索引（對齊 iztro timeToIndex） */
 function hourToBranchIndex(hour24) {
   const h = ((parseInt(hour24, 10) % 24) + 24) % 24;
-  if (h === 23) return 12;
-  return Math.floor((h + 1) / 2) % 12;
+  if (h === 0) return 0;   // 早子時 00:00–00:59
+  if (h === 23) return 12; // 晚子時 23:00–23:59
+  return Math.floor((h + 1) / 2);
+}
+
+/** 晚子時標記(12) → 地支索引 子(0)，供安命宮／流月等使用 */
+function normalizeHourBranchIndex(hourBranchIdx) {
+  return hourBranchIdx >= 12 ? 0 : hourBranchIdx;
+}
+
+function isLateZiHour(hourBranchIdx) {
+  return hourBranchIdx >= 12;
+}
+
+/**
+ * 紫微安星用農曆日：晚子時（23點）換日，其餘用當日。
+ * @param {import('lunar-javascript').Solar} solar
+ */
+function getStarPlacementLunarDay(solar, hourBranchIdx) {
+  if (isLateZiHour(hourBranchIdx)) {
+    return solar.next(1).getLunar().getDay();
+  }
+  return solar.getLunar().getDay();
 }
 
 /**
@@ -32,7 +53,7 @@ function hourToBranchIndex(hour24) {
  * @returns {number} 命宮所在地支索引（子=0 … 亥=11）
  */
 function calculateLifePalace(lunarMonth, hourBranchIdx) {
-  const branchHour = hourBranchIdx >= 12 ? 0 : hourBranchIdx;
+  const branchHour = normalizeHourBranchIndex(hourBranchIdx);
   const monthIndex = lunarMonth - 1;
   const soulIndexFromYin = fixIndex(monthIndex - branchHour);
   return fixIndex(soulIndexFromYin + 2);
@@ -189,6 +210,9 @@ module.exports = {
   PALACES: PALACE_NAMES,
   fixIndex,
   hourToBranchIndex,
+  normalizeHourBranchIndex,
+  isLateZiHour,
+  getStarPlacementLunarDay,
   calculateLifePalace,
   calculateWealthPalace,
   calculateFortunePalace,

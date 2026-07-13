@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "categories": [
     {
       "id": "technical",
@@ -11,7 +11,7 @@
           "size": 2,
           "default": true,
           "required": false,
-          "hint": "價格位階與日漲跌幅，反映當前市場位階與短期動能。"
+          "hint": "近 60 日滾動 Z 分數（自適應波動）與日漲跌幅 %，不受絕對股價影響。"
         },
         {
           "key": "moving_average",
@@ -79,7 +79,7 @@
           "size": 2,
           "default": true,
           "required": true,
-          "hint": "現金與持倉佔初始資金比例，RL 必備特徵。"
+          "hint": "現金與持倉佔總資產比例（%），與絕對股價無關，大盤暴漲時仍可比較。"
         }
       ]
     },

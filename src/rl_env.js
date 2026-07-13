@@ -1,15 +1,20 @@
-const { Solar } = require('lunar-javascript');
 const {
     FEATURE_SCHEMA_VERSION,
     buildNatalContext,
     buildStateVector,
     getStateSize,
     normalizeFeatureConfig,
+    ADAPTIVE_LOOKBACK_DAYS,
+    DEFAULT_REWARD_CLIP_PCT,
 } = require('./rl_features');
 
 const TRADING_DAYS_PER_YEAR = 252;
-const DEFAULT_ANNUAL_INFLATION_RATE = 0.02; // 台灣近年通膨約 2%
-const DEFAULT_INACTION_PENALTY_RATE = 0.00003; // 每日未交易額外懲罰（佔初始資金）
+const DEFAULT_ANNUAL_INFLATION_RATE = 0.02;
+const DEFAULT_INACTION_PENALTY_RATE = 0.00003;
+
+function clamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+}
 
 class TianjiEnv {
     constructor(marketData, userBirth, featureConfig, rewardConfig = {}) {
@@ -26,14 +31,19 @@ class TianjiEnv {
         this.annualInflationRate = rewardConfig.annualInflationRate ?? DEFAULT_ANNUAL_INFLATION_RATE;
         this.tradingDaysPerYear = rewardConfig.tradingDaysPerYear ?? TRADING_DAYS_PER_YEAR;
         this.inactionPenaltyRate = rewardConfig.inactionPenaltyRate ?? DEFAULT_INACTION_PENALTY_RATE;
+        this.lookbackDays = rewardConfig.lookbackDays ?? ADAPTIVE_LOOKBACK_DAYS;
+        this.rewardClipPct = rewardConfig.rewardClipPct ?? DEFAULT_REWARD_CLIP_PCT;
         this.dailyInflationRate = this.annualInflationRate / this.tradingDaysPerYear;
         this.cumulativeInflationLoss = 0;
         this.cumulativeInactionPenalty = 0;
 
-        this.natalCtx = buildNatalContext(userBirth);
-        this.maxPrice = Math.max(...this.marketData.map(d => d.close), 1);
+        this.normConfig = {
+            lookbackDays: this.lookbackDays,
+            rewardClipPct: this.rewardClipPct,
+        };
 
-        // 福德宮風險偏好代理：命宮與財帛宮地支差異
+        this.natalCtx = buildNatalContext(userBirth);
+
         const riskSpread = Math.abs(this.natalCtx.lifePalaceIdx - this.natalCtx.wealthPalaceIdx);
         this.fortuneRiskFactor = riskSpread <= 3 ? 1.15 : 1.0;
 
@@ -66,16 +76,15 @@ class TianjiEnv {
         if (this.currentStep >= this.marketData.length) {
             return Array(this.getStateSize()).fill(0);
         }
-        const today = this.marketData[this.currentStep];
         return buildStateVector({
             marketData: this.marketData,
             step: this.currentStep,
-            maxPrice: this.maxPrice,
             capital: this.capital,
             shares: this.shares,
-            initialCapital: this.initialCapital,
+            portfolioValue: this.portfolioValue,
             natalCtx: this.natalCtx,
             featureConfig: this.featureConfig,
+            normConfig: this.normConfig,
         });
     }
 
@@ -85,6 +94,12 @@ class TianjiEnv {
 
     getActionSize() {
         return this.actionMap.length;
+    }
+
+    _computeDailyReturn(prevPortfolioValue, nextPortfolioValue) {
+        if (prevPortfolioValue <= 0) return 0;
+        const rawPct = (nextPortfolioValue - prevPortfolioValue) / prevPortfolioValue;
+        return clamp(rawPct, -this.rewardClipPct, this.rewardClipPct) / this.rewardClipPct;
     }
 
     step(actionIdx) {
@@ -123,22 +138,20 @@ class TianjiEnv {
             }
         }
 
-        // 現金購買力因通膨每日萎縮（僅影響閒置現金）
         const inflationLoss = this.capital * this.dailyInflationRate;
         this.capital -= inflationLoss;
         this.cumulativeInflationLoss += inflationLoss;
 
         this.portfolioValue = this.capital + this.shares * currentPrice;
 
-        let reward = (this.portfolioValue - prevPortfolioValue) / this.initialCapital;
+        let reward = this._computeDailyReturn(prevPortfolioValue, this.portfolioValue);
 
-        // 未實際成交（觀望 / 空手）額外懲罰，鼓勵適度參與市場
         let inactionPenalty = 0;
         if (!traded) {
-            const cashRatio = this.capital / this.initialCapital;
-            inactionPenalty = this.inactionPenaltyRate * Math.max(cashRatio, 0);
+            const cashWeight = this.portfolioValue > 0 ? this.capital / this.portfolioValue : 0;
+            inactionPenalty = this.inactionPenaltyRate * Math.max(cashWeight, 0);
             reward -= inactionPenalty;
-            this.cumulativeInactionPenalty += inactionPenalty * this.initialCapital;
+            this.cumulativeInactionPenalty += inactionPenalty * prevPortfolioValue;
         }
 
         if (this.shares > 0 && reward < 0) {
@@ -148,6 +161,9 @@ class TianjiEnv {
         this.currentStep++;
         const done = this.currentStep >= this.marketData.length - 1;
         const exposure = this.portfolioValue > 0 ? (this.shares * currentPrice) / this.portfolioValue : 0;
+        const dailyReturnPct = prevPortfolioValue > 0
+            ? ((this.portfolioValue - prevPortfolioValue) / prevPortfolioValue) * 100
+            : 0;
 
         return {
             state: this._getState(),
@@ -163,6 +179,7 @@ class TianjiEnv {
                 inflationLoss,
                 inactionPenalty,
                 cumulativeInflationLoss: this.cumulativeInflationLoss,
+                dailyReturnPct,
             },
         };
     }

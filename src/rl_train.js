@@ -158,12 +158,16 @@ async function trainModel(userId, userBirth, marketData, epochs, hyperParams = {
             marketDim,
             enabledFeatures: normalizedFeatures,
             featureGroups: getEnabledFeatureGroups(normalizedFeatures),
-            architecture: 'dual-tower-dqn-v3',
+            architecture: 'dual-tower-dqn-v4',
             rewardConfig: {
                 annualInflationRate: env.annualInflationRate,
                 tradingDaysPerYear: env.tradingDaysPerYear,
                 inactionPenaltyRate: env.inactionPenaltyRate,
                 dailyInflationRate: env.dailyInflationRate,
+                lookbackDays: env.lookbackDays,
+                rewardClipPct: env.rewardClipPct,
+                rewardMode: 'daily_return_pct',
+                normalization: 'adaptive_rolling',
             },
             hyperParams: {
                 batchSize: batchSize,

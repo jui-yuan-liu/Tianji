@@ -8,7 +8,10 @@ const { getTimeTransformations } = require('./ziwei_periods');
 const { resolveHoroscope } = require('./ziwei_horoscope');
 const { Solar } = require('lunar-javascript');
 
-const FEATURE_SCHEMA_VERSION = 3;
+const FEATURE_SCHEMA_VERSION = 4;
+
+const ADAPTIVE_LOOKBACK_DAYS = 60;
+const DEFAULT_REWARD_CLIP_PCT = 0.05;
 
 const MAJOR_STAR_NAMES = ['紫微', '天機', '太陽', '武曲', '天同', '廉貞', '天府', '太陰', '貪狼', '巨門', '天相', '天梁', '七殺', '破軍'];
 const WEALTH_STARS = ['武曲', '太陰', '天府'];
@@ -25,7 +28,7 @@ const FEATURE_CATALOG = {
         categoryLabel: '技術指標',
         default: true,
         tower: 'market',
-        hint: '價格位階與日漲跌幅，反映當前市場位階與短期動能。',
+        hint: '近 60 日滾動 Z 分數（自適應波動）與日漲跌幅 %，不受絕對股價影響。',
     },
     moving_average: {
         size: 2,
@@ -89,7 +92,7 @@ const FEATURE_CATALOG = {
         default: true,
         required: true,
         tower: 'market',
-        hint: '現金與持倉佔初始資金比例，RL 必備特徵。',
+        hint: '現金與持倉佔總資產比例（%），與絕對股價無關，大盤暴漲時仍可比較。',
     },
     natal: {
         size: 9,
@@ -348,12 +351,35 @@ function computeRsi(closes, period = 14) {
     return clamp((rs / (1 + rs) - 0.5) * 2, -1, 1);
 }
 
-function getPriceMomentumFeatures(marketData, step, maxPrice) {
+function getRollingWindow(marketData, step, lookback = ADAPTIVE_LOOKBACK_DAYS) {
+    const start = Math.max(0, step - lookback + 1);
+    return marketData.slice(start, step + 1);
+}
+
+function getAdaptivePriceContext(marketData, step, lookback = ADAPTIVE_LOOKBACK_DAYS) {
+    const window = getRollingWindow(marketData, step, lookback);
+    const closes = window.map((d) => d.close);
+    const today = closes[closes.length - 1];
+    const mean = closes.reduce((a, b) => a + b, 0) / closes.length;
+    let variance = 0;
+    for (const c of closes) variance += (c - mean) ** 2;
+    const std = Math.sqrt(variance / closes.length);
+    const rollZ = std > 0 ? clamp((today - mean) / (2 * std), -1, 1) : 0;
+
+    return { rollZ, minC: Math.min(...closes), maxC: Math.max(...closes), today, mean, std };
+}
+
+function getPriceMomentumFeatures(marketData, step, normConfig = {}) {
+    const lookback = normConfig.lookbackDays ?? ADAPTIVE_LOOKBACK_DAYS;
     const today = marketData[step];
     const prev = step > 0 ? marketData[step - 1] : today;
-    const priceNorm = today.close / maxPrice;
-    const priceChangePct = clamp(prev.close > 0 ? (today.close - prev.close) / prev.close : 0, -0.15, 0.15) / 0.15;
-    return [priceNorm, priceChangePct];
+    const ctx = getAdaptivePriceContext(marketData, step, lookback);
+    const priceChangePct = clamp(
+        prev.close > 0 ? (today.close - prev.close) / prev.close : 0,
+        -0.15,
+        0.15
+    ) / 0.15;
+    return [ctx.rollZ, priceChangePct];
 }
 
 function getMovingAverageFeatures(marketData, step) {
@@ -423,10 +449,12 @@ function getPriceVolumeCorrFeature(marketData, step) {
     return [pvCorr];
 }
 
-function getPortfolioFeatures(capital, shares, price, initialCapital) {
+function getPortfolioFeatures(capital, shares, price, portfolioValue) {
+    const pv = Math.max(portfolioValue, 1);
+    const positionValue = shares * price;
     return [
-        capital / initialCapital,
-        (shares * price) / initialCapital,
+        clamp(capital / pv, 0, 1),
+        clamp(positionValue / pv, 0, 1),
     ];
 }
 
@@ -509,20 +537,31 @@ function getMoonCycleFeatures(period) {
     ];
 }
 
-function buildStateVector({ marketData, step, maxPrice, capital, shares, initialCapital, natalCtx, featureConfig }) {
+function buildStateVector({
+    marketData,
+    step,
+    capital,
+    shares,
+    portfolioValue,
+    natalCtx,
+    featureConfig,
+    normConfig,
+}) {
     const cfg = normalizeFeatureConfig(featureConfig);
     const today = marketData[step];
+    const pv = portfolioValue ?? (capital + shares * today.close);
     const period = getPeriodContext(new Date(today.time), natalCtx);
     const parts = [];
+    const nc = normConfig || {};
 
-    if (cfg.price_momentum) parts.push(...getPriceMomentumFeatures(marketData, step, maxPrice));
+    if (cfg.price_momentum) parts.push(...getPriceMomentumFeatures(marketData, step, nc));
     if (cfg.moving_average) parts.push(...getMovingAverageFeatures(marketData, step));
     if (cfg.volatility) parts.push(...getVolatilityFeature(marketData, step));
     if (cfg.rsi) parts.push(...getRsiFeature(marketData, step));
     if (cfg.volume_change) parts.push(...getVolumeChangeFeature(marketData, step));
     if (cfg.volume_level) parts.push(...getVolumeLevelFeature(marketData, step));
     if (cfg.price_volume_corr) parts.push(...getPriceVolumeCorrFeature(marketData, step));
-    if (cfg.portfolio) parts.push(...getPortfolioFeatures(capital, shares, today.close, initialCapital));
+    if (cfg.portfolio) parts.push(...getPortfolioFeatures(capital, shares, today.close, pv));
     if (cfg.natal) parts.push(...getNatalFeatures(natalCtx));
     if (cfg.decade_wealth) parts.push(...getWealthPalaceFeatures(natalCtx.allStars, period.decadeLifePos, period.yearStem));
     if (cfg.annual_wealth) parts.push(...getWealthPalaceFeatures(natalCtx.allStars, period.annualLifePos, period.yearStem));
@@ -546,11 +585,11 @@ function getExplainabilityFactors(state, featureConfig) {
         return state[entry.start + offset];
     };
 
-    const priceNorm = read('price_momentum', 0);
-    if (priceNorm != null) factors.push({ name: '價格位階', value: clamp((priceNorm - 0.5) * 2) });
+    const priceDev = read('price_momentum', 0);
+    if (priceDev != null) factors.push({ name: '價格 Z 分數', value: priceDev });
 
     const momentum = read('price_momentum', 1);
-    if (momentum != null) factors.push({ name: '短期動能', value: momentum });
+    if (momentum != null) factors.push({ name: '日漲跌幅', value: momentum });
 
     const ma5 = read('moving_average', 0);
     if (ma5 != null) factors.push({ name: 'MA5 偏離', value: ma5 });
@@ -562,7 +601,7 @@ function getExplainabilityFactors(state, featureConfig) {
     if (vol != null) factors.push({ name: '波動率', value: vol });
 
     const exposure = read('portfolio', 1);
-    if (exposure != null) factors.push({ name: '持倉曝險', value: clamp((exposure - 0.5) * 2) });
+    if (exposure != null) factors.push({ name: '持倉比重', value: clamp(exposure * 2 - 1) });
 
     const dailyLu = read('daily_wealth', 1);
     if (dailyLu != null) factors.push({ name: '流日化祿', value: dailyLu ? 0.9 : -0.1 });
@@ -587,6 +626,8 @@ const FEATURE_GROUPS = getEnabledFeatureGroups(getDefaultFeatureConfig());
 
 module.exports = {
     FEATURE_SCHEMA_VERSION,
+    ADAPTIVE_LOOKBACK_DAYS,
+    DEFAULT_REWARD_CLIP_PCT,
     FEATURE_CATALOG,
     FEATURE_ORDER,
     FEATURE_GROUPS,
@@ -605,4 +646,5 @@ module.exports = {
     getEnabledFeatureGroups,
     getExplainabilityFactors,
     getPeriodContext,
+    getAdaptivePriceContext,
 };

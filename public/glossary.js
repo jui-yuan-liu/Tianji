@@ -27,7 +27,14 @@ const GLOSSARY_DATA = {
         "福德": "【投資心態】 影響偏財運、直覺與承擔風險的心理素質。也是享受財富的能力。",
         "父母": "【監管/文書】 代表與銀行、政府機關的關係，或合約文書運。"
     },
-    stars: {
+    stars: typeof STAR_INVESTMENT_GUIDE !== 'undefined'
+        ? Object.fromEntries(
+            Object.entries(STAR_INVESTMENT_GUIDE).map(([name, star]) => [
+                name,
+                `${star.title} ${star.glossary}`,
+            ])
+        )
+        : {
         "紫微": "【帝王之星】 屬土。代表領導統御、尊貴、權力與面子。投資偏好大型權值股、龍頭企業。",
         "天機": "【智慧之星】 屬木。代表機智變動、分析、計算。適合軟體、AI、科技股或短線靈活操作。",
         "太陽": "【官祿之主】 屬火。代表博愛光明、名聲、對外擴展。適合能源、公用事業、大眾傳播。",

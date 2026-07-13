@@ -312,24 +312,70 @@ app.post('/api/calculate', (req, res) => {
         let wealthStar = "空宮 (Empty)";
         if (wealthPalaceData.stars.length > 0) wealthStar = wealthPalaceData.stars.join(", ");
 
-        // Match Stocks
-        // Using calculation indices directly for more robustness
         const wealthIdx = calculateWealthPalace(lifePalaceIdx);
-        const propertyIdx = (lifePalaceIdx - 9 + 12) % 12; // Property is 10th palace (index 9 CCW)
-        
-        const finalMatchedStocks = matchStocks({
-            '財帛宮': chart[wealthIdx],
-            '田宅宮': chart[propertyIdx]
-        });
+        const propertyIdx = (lifePalaceIdx - 9 + 12) % 12;
 
-        // Resonance Recommendations
-        const resonanceStocks = recommendResonanceStocks({
-            wealthPalaceBranch: ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"][wealthIdx],
-            wealthStars: chart[wealthIdx] ? chart[wealthIdx].stars.map(s => s.split(' ')[0]) : [],
-            propertyPalaceBranch: ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"][propertyIdx],
-            propertyStars: chart[propertyIdx] ? chart[propertyIdx].stars.map(s => s.split(' ')[0]) : [],
-            bureau: fiveElementBureau
-        });
+        const branchNames = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+        const propertyIdxFromLife = (lifePos) => (lifePos - 9 + 12) % 12;
+
+        const buildPalaceStockRecommendations = (wIdx, pIdx, getStars, withResonance, context = {}) => {
+            const wealthCell = chart[wIdx];
+            const propertyCell = chart[pIdx];
+            const wStars = getStars(wealthCell);
+            const pStars = getStars(propertyCell);
+            const starNames = (stars) => stars.map(s => s.split(' ')[0].trim()).filter(Boolean);
+
+            return {
+                matchedStocks: matchStocks({
+                    '財帛宮': { stars: wStars, branch: branchNames[wIdx] },
+                    '田宅宮': { stars: pStars, branch: branchNames[pIdx] },
+                }, {
+                    periodLabel: context.periodLabel || '本命',
+                    wealthBranch: branchNames[wIdx],
+                    propertyBranch: branchNames[pIdx],
+                }),
+                resonanceStocks: withResonance ? recommendResonanceStocks({
+                    wealthPalaceBranch: branchNames[wIdx],
+                    wealthStars: starNames(wStars),
+                    propertyPalaceBranch: branchNames[pIdx],
+                    propertyStars: starNames(pStars),
+                    bureau: fiveElementBureau,
+                }) : [],
+                wealthBranch: branchNames[wIdx],
+                propertyBranch: branchNames[pIdx],
+                wealthStars: wStars,
+                propertyStars: pStars,
+            };
+        };
+
+        const natalStockRecs = buildPalaceStockRecommendations(
+            wealthIdx,
+            propertyIdx,
+            (cell) => cell?.layers?.natal?.stars || [],
+            false,
+            { periodLabel: '本命' }
+        );
+
+        const flowPeriodDefs = [
+            { key: 'annual', label: '流年', lifePos: annualLifePos, getStars: (cell) => cell?.layers?.annual?.stars || [] },
+            { key: 'monthly', label: '流月', lifePos: monthlyLifePos, getStars: (cell) => cell?.layers?.monthly?.stars || [] },
+            { key: 'daily', label: '流日', lifePos: dailyLifePos, getStars: (cell) => cell?.layers?.daily?.stars || [] },
+        ];
+
+        const flowPeriods = {};
+        for (const period of flowPeriodDefs) {
+            const wIdx = calculateWealthPalace(period.lifePos);
+            const pIdx = propertyIdxFromLife(period.lifePos);
+            flowPeriods[period.key] = {
+                ...buildPalaceStockRecommendations(wIdx, pIdx, period.getStars, true, {
+                    periodLabel: period.label,
+                }),
+                lifeBranch: branchNames[period.lifePos],
+                periodLabel: period.label,
+            };
+        }
+
+        const flowStockRecs = flowPeriods.daily;
 
         const strategy = getInvestmentStrategy(wealthStar, "Unknown");
         
@@ -356,8 +402,16 @@ app.post('/api/calculate', (req, res) => {
             strategy: {
                 ...strategy,
                 wealthStar: wealthStar,
-                matchedStocks: finalMatchedStocks,
-                resonanceStocks: resonanceStocks
+                matchedStocks: natalStockRecs.matchedStocks,
+                resonanceStocks: flowStockRecs.resonanceStocks,
+                stockRecommendations: {
+                    natal: natalStockRecs,
+                    flow: {
+                        periods: flowPeriods,
+                        targetLunarDate: targetLunar.toString(),
+                        dailyLifeBranch: branchNames[dailyLifePos],
+                    }
+                }
             }
         });
 

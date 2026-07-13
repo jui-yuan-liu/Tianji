@@ -69,11 +69,26 @@
                                 </div>
                                 <div class="dash-panel-highlight" id="d-desc" style="color: var(--text-secondary); line-height: 1.7;">--</div>
                                 <div class="dash-panel-warning font-bold" id="d-strat">--</div>
-                                <div id="d-stocks-container" class="hidden">
-                                    <div class="text-xs mb-2 pb-1" style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle)">標籤匹配推薦</div>
-                                    <div id="d-stocks" class="flex flex-wrap gap-2 mb-4"></div>
-                                    <div class="text-xs mb-2 pb-1" style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle)">命盤共振精選 (Top 10)</div>
-                                    <div id="d-resonance" class="space-y-2"></div>
+                                <div id="d-stocks-container" class="hidden space-y-5">
+                                    <section id="d-stocks-natal-section">
+                                        <div class="text-sm font-semibold mb-1" style="color: var(--text-primary)">本命盤推薦</div>
+                                        <div id="d-natal-palace-info" class="text-[10px] mb-2" style="color: var(--text-muted)"></div>
+                                        <div class="text-xs mb-2 pb-1" style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle)">標籤匹配</div>
+                                        <div id="d-stocks-natal" class="flex flex-wrap gap-2"></div>
+                                    </section>
+                                    <section id="d-stocks-flow-section" class="pt-3" style="border-top: 1px solid var(--border-subtle)">
+                                        <div class="text-sm font-semibold mb-2" style="color: var(--text-primary)">流運盤推薦</div>
+                                        <div class="flow-period-switcher">
+                                            <button type="button" id="flow-prev" class="dash-btn-icon" aria-label="上一個流運">‹</button>
+                                            <span id="flow-period-label" class="flow-period-label">流日推薦</span>
+                                            <button type="button" id="flow-next" class="dash-btn-icon" aria-label="下一個流運">›</button>
+                                        </div>
+                                        <div id="d-flow-palace-info" class="text-[10px] mb-2" style="color: var(--text-muted)"></div>
+                                        <div class="text-xs mb-2 pb-1" style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle)">標籤匹配</div>
+                                        <div id="d-stocks-flow" class="flex flex-wrap gap-2 mb-3"></div>
+                                        <div class="text-xs mb-2 pb-1" style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle)">命盤共振精選 (Top 10)</div>
+                                        <div id="d-resonance-flow" class="space-y-2"></div>
+                                    </section>
                                 </div>
                             </div>
                         </div>
@@ -119,6 +134,224 @@
         let chart;
         let candlestickSeries;
         let currentModelId = 'latest';
+
+        let flowPeriodIndex = 2;
+        let flowPeriodsData = null;
+        let flowTargetDate = '';
+        const FLOW_PERIOD_KEYS = ['annual', 'monthly', 'daily'];
+        const FLOW_PERIOD_LABELS = ['流年', '流月', '流日'];
+        let stockTooltipEl = null;
+
+        function escapeAttr(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;');
+        }
+
+        function escapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function formatStockTooltipHtml(stock, matched) {
+            const detail = stock.reasonDetail;
+            if (!detail) {
+                const fallback = stock.reason || matched?.reason || '依排盤室辭典：財帛宮與田宅宮主星定性產業方向';
+                return `<div class="stock-tip-summary">${escapeHtml(fallback)}</div>`;
+            }
+
+            let html = `<div class="stock-tip-title">${escapeHtml(detail.periodLabel)} · 標籤匹配</div>`;
+            html += `<div class="stock-tip-meta">財帛（${escapeHtml(detail.wealthBranch)}）· 田宅（${escapeHtml(detail.propertyBranch)}）</div>`;
+
+            if (detail.neutral) {
+                html += `<div class="stock-tip-block stock-tip-neutral">${escapeHtml(detail.neutralReason)}</div>`;
+            } else {
+                (detail.matches || []).forEach((m) => {
+                    html += `<div class="stock-tip-block">`;
+                    html += `<div class="stock-tip-palace">${escapeHtml(m.palace)}宮${m.branch ? `（${escapeHtml(m.branch)}）` : ''}</div>`;
+                    html += `<div class="stock-tip-palace-desc">${escapeHtml(m.palaceDesc)}</div>`;
+                    html += `<div class="stock-tip-star"><span class="stock-tip-star-name">${escapeHtml(m.star)}</span> ${escapeHtml(m.starTitle)}</div>`;
+                    html += `<div class="stock-tip-glossary">${escapeHtml(m.starGlossary)}</div>`;
+                    html += `<div class="stock-tip-invest"><span>投資取向：</span>${escapeHtml(m.invest)}</div>`;
+                    html += `<div class="stock-tip-industry"><span>產業方向：</span>${escapeHtml(m.industries)}</div>`;
+                    html += `</div>`;
+                });
+            }
+
+            if (detail.methodology) {
+                html += `<div class="stock-tip-foot">${escapeHtml(detail.methodology)}</div>`;
+            }
+            return html;
+        }
+
+        function positionStockTooltip(tip, clientX, clientY) {
+            const pad = 14;
+            let left = clientX + pad;
+            let top = clientY + pad;
+            tip.style.left = `${left}px`;
+            tip.style.top = `${top}px`;
+            const rect = tip.getBoundingClientRect();
+            if (left + rect.width > window.innerWidth - 8) {
+                left = Math.max(8, clientX - rect.width - pad);
+            }
+            if (top + rect.height > window.innerHeight - 8) {
+                top = Math.max(8, clientY - rect.height - pad);
+            }
+            tip.style.left = `${left}px`;
+            tip.style.top = `${top}px`;
+        }
+
+        function ensureStockTooltip() {
+            if (!stockTooltipEl) {
+                stockTooltipEl = document.createElement('div');
+                stockTooltipEl.id = 'stock-rec-tooltip';
+                stockTooltipEl.className = 'stock-rec-tooltip';
+                document.body.appendChild(stockTooltipEl);
+            }
+            return stockTooltipEl;
+        }
+
+        function bindStockTagTooltips(container) {
+            if (!container) return;
+            const tip = ensureStockTooltip();
+            container.querySelectorAll('.stock-rec-tag').forEach((tag) => {
+                tag.addEventListener('mouseenter', () => {
+                    const detailRaw = tag.getAttribute('data-detail');
+                    let html = '';
+                    if (detailRaw) {
+                        try {
+                            const stock = { reasonDetail: JSON.parse(detailRaw) };
+                            html = formatStockTooltipHtml(stock, null);
+                        } catch (e) {
+                            html = `<div class="stock-tip-summary">${escapeHtml(tag.getAttribute('data-tip') || '')}</div>`;
+                        }
+                    } else {
+                        html = `<div class="stock-tip-summary">${escapeHtml(tag.getAttribute('data-tip') || '')}</div>`;
+                    }
+                    if (!html.trim()) return;
+                    tip.innerHTML = html;
+                    tip.classList.add('visible');
+                });
+                tag.addEventListener('mousemove', (e) => {
+                    positionStockTooltip(tip, e.clientX, e.clientY);
+                });
+                tag.addEventListener('mouseleave', () => {
+                    tip.classList.remove('visible');
+                    tip.innerHTML = '';
+                });
+            });
+        }
+
+        function renderStockTags(containerId, matched) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const stocks = matched?.stocks || [];
+            if (stocks.length === 0) {
+                el.innerHTML = '<span class="text-xs" style="color:var(--text-muted)">暫無匹配標的</span>';
+                return;
+            }
+            el.innerHTML = stocks.map((s) => {
+                const reason = escapeAttr(s.reason || matched?.reason || '依排盤室辭典推薦');
+                const detail = s.reasonDetail ? escapeAttr(JSON.stringify(s.reasonDetail)) : '';
+                return `<span class="dash-badge tag stock-rec-tag" data-tip="${reason}" data-detail="${detail}">${s.code} ${s.name}</span>`;
+            }).join('');
+            bindStockTagTooltips(el);
+        }
+
+        function renderResonanceList(containerId, resonance) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const list = resonance || [];
+            if (list.length === 0) {
+                el.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">暫無共振標的（請確認股票資料已同步）</div>';
+                return;
+            }
+            el.innerHTML = list.map(s => `
+                <div class="dash-panel">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-gold font-bold text-xs">${s.code} ${s.name}</span>
+                        <span class="text-[10px]" style="color:var(--text-muted)">契合度: ${s.score}</span>
+                    </div>
+                    <div class="text-[10px] leading-tight" style="color:var(--text-muted)">
+                        ${s.reasons.map(r => `• ${r}`).join('<br>')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderPalaceInfo(elId, rec, extra = '') {
+            const el = document.getElementById(elId);
+            if (!el || !rec) return;
+            const fmt = (stars) => (stars && stars.length > 0 ? stars.join('、') : '空宮');
+            el.textContent = `財帛（${rec.wealthBranch}宮）${fmt(rec.wealthStars)} · 田宅（${rec.propertyBranch}宮）${fmt(rec.propertyStars)}${extra}`;
+        }
+
+        function renderFlowPeriod(index) {
+            if (!flowPeriodsData) return;
+            const key = FLOW_PERIOD_KEYS[index];
+            const data = flowPeriodsData[key];
+            if (!data) return;
+
+            const labelEl = document.getElementById('flow-period-label');
+            if (labelEl) labelEl.textContent = `${FLOW_PERIOD_LABELS[index]}推薦`;
+
+            const extra = ` · ${data.periodLabel || FLOW_PERIOD_LABELS[index]}命宮${data.lifeBranch}宮`;
+            const dateSuffix = flowTargetDate ? `（${flowTargetDate}）` : '';
+            renderPalaceInfo('d-flow-palace-info', data, extra + dateSuffix);
+            renderStockTags('d-stocks-flow', data.matchedStocks);
+            renderResonanceList('d-resonance-flow', data.resonanceStocks);
+        }
+
+        function initFlowSwitcher() {
+            const prev = document.getElementById('flow-prev');
+            const next = document.getElementById('flow-next');
+            if (!prev || !next) return;
+            prev.onclick = () => {
+                flowPeriodIndex = (flowPeriodIndex + FLOW_PERIOD_KEYS.length - 1) % FLOW_PERIOD_KEYS.length;
+                renderFlowPeriod(flowPeriodIndex);
+            };
+            next.onclick = () => {
+                flowPeriodIndex = (flowPeriodIndex + 1) % FLOW_PERIOD_KEYS.length;
+                renderFlowPeriod(flowPeriodIndex);
+            };
+        }
+
+        function hasFlowData(flow) {
+            if (!flow?.periods) return false;
+            return FLOW_PERIOD_KEYS.some((key) => {
+                const p = flow.periods[key];
+                return (p?.matchedStocks?.stocks?.length > 0) || (p?.resonanceStocks?.length > 0);
+            });
+        }
+
+        function renderStockRecommendations(calcData) {
+            const recs = calcData.strategy?.stockRecommendations;
+            if (!recs) return;
+
+            const natal = recs.natal;
+            const flow = recs.flow;
+            const hasNatal = (natal?.matchedStocks?.stocks?.length > 0);
+            const hasFlow = hasFlowData(flow);
+
+            if (!hasNatal && !hasFlow) return;
+
+            document.getElementById('d-stocks-container').classList.remove('hidden');
+            renderPalaceInfo('d-natal-palace-info', natal);
+            renderStockTags('d-stocks-natal', natal?.matchedStocks);
+
+            const flowSection = document.getElementById('d-stocks-flow-section');
+            if (flowSection) flowSection.classList.toggle('hidden', !hasFlow);
+
+            if (hasFlow && flow.periods) {
+                flowPeriodsData = flow.periods;
+                flowTargetDate = flow.targetLunarDate || '';
+                initFlowSwitcher();
+                renderFlowPeriod(flowPeriodIndex);
+            }
+        }
 
         async function initDashboard() {
             const user = await fetchMe();
@@ -191,34 +424,16 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             year: user.birthYear, month: user.birthMonth,
-                            day: user.birthDay, hour: user.birthHour
+                            day: user.birthDay, hour: user.birthHour,
+                            targetDate: today
                         })
                     }).then(r => r.json()).then(calcData => {
-                        const matched = calcData.strategy.matchedStocks;
-                        const resonance = calcData.strategy.resonanceStocks;
-
-                        if ((matched?.stocks?.length > 0) || (resonance?.length > 0)) {
-                            document.getElementById('d-stocks-container').classList.remove('hidden');
-                            if (matched?.stocks) {
-                                document.getElementById('d-stocks').innerHTML = matched.stocks.map(s =>
-                                    `<span class="dash-badge tag">${s.code} ${s.name}</span>`
-                                ).join('');
-                            }
-                            if (resonance) {
-                                document.getElementById('d-resonance').innerHTML = resonance.map(s => `
-                                    <div class="dash-panel">
-                                        <div class="flex justify-between items-center mb-1">
-                                            <span class="text-gold font-bold text-xs">${s.code} ${s.name}</span>
-                                            <span class="text-[10px]" style="color:var(--text-muted)">契合度: ${s.score}</span>
-                                        </div>
-                                        <div class="text-[10px] leading-tight" style="color:var(--text-muted)">
-                                            ${s.reasons.map(r => `• ${r}`).join('<br>')}
-                                        </div>
-                                    </div>
-                                `).join('');
-                            }
+                        if (calcData.error) {
+                            console.error('Calculate API error:', calcData.error);
+                            return;
                         }
-                    });
+                        renderStockRecommendations(calcData);
+                    }).catch(err => console.error('Stock recommendation fetch failed', err));
                 }).catch(err => {
                     console.error('Daily fortune fetch failed', err);
                     document.getElementById('daily-loading').classList.add('hidden');

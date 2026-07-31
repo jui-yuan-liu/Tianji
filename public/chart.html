@@ -5,84 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tianji 天機 - 專業排盤室 (宮位本位模式)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/dashboard.css">
     <script src="/app.js"></script>
+    <script src="/star_investment_guide.js"></script>
     <script src="/glossary.js"></script>
-    <style>
-        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
-        .bg-surface { background-color: #1e293b; }
-        .bg-midnight { background-color: #0f172a; }
-        .text-gold { color: #f59e0b; }
-        
-        /* CSS Grid Mapping for Fixed Palaces (Clockwise) */
-        .chart-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 8px; }
-        .area-p1 { grid-area: 1 / 1; } /* 命宮 */
-        .area-p2 { grid-area: 1 / 2; } /* 兄弟 */
-        .area-p3 { grid-area: 1 / 3; } /* 夫妻 */
-        .area-p4 { grid-area: 1 / 4; } /* 子女 */
-        .area-p5 { grid-area: 2 / 4; } /* 財帛 */
-        .area-p6 { grid-area: 3 / 4; } /* 疾厄 */
-        .area-p7 { grid-area: 4 / 4; } /* 遷移 */
-        .area-p8 { grid-area: 4 / 3; } /* 交友 */
-        .area-p9 { grid-area: 4 / 2; } /* 官祿 */
-        .area-p10 { grid-area: 4 / 1; } /* 田宅 */
-        .area-p11 { grid-area: 3 / 1; } /* 福德 */
-        .area-p12 { grid-area: 2 / 1; } /* 父母 */
-        .area-center { grid-column: 2 / span 2; grid-row: 2 / span 2; }
-        
-        .palace-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; position: relative; overflow: hidden; min-height: 120px; transition: all 0.3s; padding: 4px; }
-        .palace-card:hover { border-color: #8b5cf6; box-shadow: 0 0 15px rgba(139, 92, 246, 0.3); transform: scale(1.02); z-index: 10; cursor: pointer; }
-        
-        .palace-watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 900; color: rgba(255, 255, 255, 0.04); pointer-events: none; z-index: 0; white-space: nowrap; }
-        .branch-badge { position: absolute; top: 6px; left: 8px; font-size: 0.75rem; font-weight: 700; color: #f59e0b; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 1px 6px; border-radius: 4px; z-index: 10;}
-        .star-item { position: relative; z-index: 1; font-size: 0.85rem; font-weight: 600; line-height: 1.4; }
-        
-        .layer-btn { transition: all 0.2s; }
-        .layer-btn.active { background-color: #9333ea; color: white; border-color: #a855f7; box-shadow: 0 0 10px rgba(168, 85, 247, 0.5); }
-        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-    </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body>
     <script src="/nav.js"></script>
 
-    <!-- Content -->
-    <div class="flex-1 max-w-7xl mx-auto p-4 w-full" id="main-content">
+    <div class="dash-content" id="main-content">
         <!-- Error State -->
-        <div id="auth-error" class="hidden text-center py-20">
-            <h2 class="text-2xl font-bold text-red-400 mb-4">存取被拒絕</h2>
-            <p class="text-slate-400 mb-6">請先登入會員以存取專業排盤室。</p>
-            <a href="/login.html" class="bg-purple-600 px-6 py-2 rounded text-white font-bold hover:bg-purple-500 transition">前往登入</a>
+        <div id="auth-error" class="hidden dash-hero">
+            <h2 class="text-2xl font-bold mb-4" style="color:#f87171">存取被拒絕</h2>
+            <p class="dash-hero-desc">請先登入會員以存取專業排盤室。</p>
+            <a href="/login.html" class="dash-btn dash-btn-primary">前往登入</a>
         </div>
 
-        <div id="chart-view" class="hidden grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <!-- Left Sidebar -->
-            <div class="lg:col-span-1 space-y-4">
-                <div class="bg-surface p-4 rounded-xl shadow-lg border border-slate-700">
-                    <h2 class="text-lg font-bold text-slate-200 mb-2 border-b border-slate-700 pb-2 flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-purple-500"></span> 測算設定
-                    </h2>
-                    <div class="text-sm text-slate-400 mb-4">
-                        命主：<span id="p-name" class="font-bold text-white"></span><br>
-                        生辰：<span id="p-birth" class="text-purple-300"></span>
+        <div id="chart-view" class="hidden dash-layout dash-layout-1-3">
+            <div class="dash-stack-sm">
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title">測算設定</div>
                     </div>
-                    
+                    <div class="text-sm mb-4" style="color:var(--text-muted)">
+                        命主：<span id="p-name" class="font-bold" style="color:var(--text-primary)"></span><br>
+                        生辰：<span id="p-birth" style="color:#c4b5fd"></span>
+                    </div>
+
                     <div class="mb-4">
-                        <label class="block text-xs text-slate-400 mb-1">目標推算時間 (流年/流月/流日)</label>
-                        <input type="date" id="targetDate" class="w-full bg-midnight border border-slate-600 rounded px-3 py-2 text-white outline-none">
+                        <label class="block text-xs mb-1" style="color:var(--text-muted)">目標推算時間 (流年/流月/流日)</label>
+                        <input type="date" id="targetDate" class="dash-input w-full" style="width:100%">
                     </div>
-                    <button onclick="fetchChart()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded transition shadow-lg">
+                    <button onclick="fetchChart()" class="dash-btn dash-btn-primary w-full" style="width:100%">
                         重新計算命盤
                     </button>
                 </div>
 
-                <div class="bg-surface p-4 rounded-xl shadow-lg border border-slate-700 mt-4 text-center">
-                    <button onclick="openGlossary()" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded shadow transition flex items-center justify-center gap-2">
-                        📖 開啟命理與財經辭典
+                <div class="dash-card text-center">
+                    <button onclick="openGlossary()" class="dash-btn dash-btn-secondary w-full" style="width:100%">
+                        命理辭典
                     </button>
-                    <p class="text-xs text-slate-500 mt-2">內含閱讀流程、主星、宮位、地支詳解</p>
+                    <p class="text-xs mt-2" style="color:var(--text-muted)">內含閱讀流程、主星、宮位、地支詳解</p>
                 </div>
-                
-                <div class="bg-indigo-900/20 border border-indigo-700/50 p-4 rounded-xl text-xs text-indigo-200 leading-relaxed">
+
+                <div class="dash-panel-highlight text-xs leading-relaxed" style="color:#c4b5fd">
                     <strong class="text-indigo-300 block mb-1">💡 宮位本位模式說明：</strong>
                     此盤面採用「固定十二宮位」視角，命宮永遠在左上角。當您切換大運或流年時，觀察的是<span class="text-gold font-bold">「哪些地支與星曜飛入了這個宮位」</span>，讓分析財運(財帛宮)或事業(官祿宮)時更加直觀。<br><br>
                     <strong class="text-purple-300">滑鼠游標停靠 (Hover) 在宮位上，可即時查看該宮位與星曜的完整涵義。</strong>
@@ -90,19 +56,20 @@
             </div>
 
             <!-- Floating Tooltip -->
-            <div id="floating-tooltip" class="hidden fixed bg-surface/95 backdrop-blur-md p-4 rounded-xl shadow-2xl border border-purple-500/50 w-72 z-[9999] pointer-events-none transform transition-opacity duration-200 opacity-0"></div>
+            <div id="floating-tooltip" class="hidden fixed p-4 rounded-xl shadow-2xl w-72 z-[9999] pointer-events-none transform transition-opacity duration-200 opacity-0" style="background:var(--bg-card);backdrop-filter:blur(12px);border:1px solid var(--border-accent)"></div>
 
             <!-- Right Chart -->
-            <div class="lg:col-span-3">
-                <div class="flex gap-2 mb-4 overflow-x-auto pb-2 custom-scrollbar">
-                    <button onclick="switchLayer('natal')" id="btn-natal" class="layer-btn active px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">先天命盤</button>
-                    <button onclick="switchLayer('decade')" id="btn-decade" class="layer-btn px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">大運盤</button>
-                    <button onclick="switchLayer('annual')" id="btn-annual" class="layer-btn px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">流年盤</button>
-                    <button onclick="switchLayer('monthly')" id="btn-monthly" class="layer-btn px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">流月盤</button>
-                    <button onclick="switchLayer('daily')" id="btn-daily" class="layer-btn px-4 py-2 rounded text-sm font-bold bg-slate-800 text-slate-400 border border-slate-700">流日盤</button>
+            <div class="min-w-0">
+                <div class="dash-tabs custom-scrollbar">
+                    <button onclick="switchLayer('natal')" id="btn-natal" class="layer-btn active dash-btn dash-btn-sm dash-btn-ghost">先天命盤</button>
+                    <button onclick="switchLayer('decade')" id="btn-decade" class="layer-btn dash-btn dash-btn-sm dash-btn-ghost">大運盤</button>
+                    <button onclick="switchLayer('annual')" id="btn-annual" class="layer-btn dash-btn dash-btn-sm dash-btn-ghost">流年盤</button>
+                    <button onclick="switchLayer('monthly')" id="btn-monthly" class="layer-btn dash-btn dash-btn-sm dash-btn-ghost">流月盤</button>
+                    <button onclick="switchLayer('daily')" id="btn-daily" class="layer-btn dash-btn dash-btn-sm dash-btn-ghost">流日盤</button>
                 </div>
 
-                <div class="chart-grid w-full aspect-square md:aspect-auto md:h-[650px] max-w-[800px] mx-auto" id="astrolabe">
+                <div class="chart-grid-wrap">
+                <div class="chart-grid" id="astrolabe">
                     <!-- Fixed Palaces -->
                     <div class="palace-card area-p1" id="box-命宮"><div class="palace-watermark">命宮</div></div>
                     <div class="palace-card area-p2" id="box-兄弟"><div class="palace-watermark">兄弟</div></div>
@@ -118,7 +85,7 @@
                     <div class="palace-card area-p12" id="box-父母"><div class="palace-watermark">父母</div></div>
 
                     <!-- Center -->
-                    <div class="area-center flex flex-col items-center justify-center text-center p-4 bg-midnight/50 rounded-xl border border-slate-700 shadow-inner">
+                    <div class="area-center flex flex-col items-center justify-center text-center p-4 rounded-xl shadow-inner" style="background:var(--bg-elevated);border:1px solid var(--border-default)">
                         <div id="c-lunar" class="text-lg font-serif text-slate-200 mb-3">農曆日期</div>
                         <div class="flex flex-wrap justify-center gap-2 text-xs text-slate-400 mb-4">
                             <span id="c-bureau" class="px-2 py-1 bg-slate-800 rounded border border-slate-600">五行局</span>
@@ -131,6 +98,7 @@
                             <div class="text-red-400 font-bold">忌 <span class="text-slate-400 font-normal">風險/避險</span></div>
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
         </div>
@@ -195,12 +163,9 @@
         function switchLayer(layer) {
             currentLayer = layer;
             document.querySelectorAll('.layer-btn').forEach(btn => {
-                btn.classList.remove('active', 'bg-purple-600', 'text-white');
-                btn.classList.add('bg-slate-800', 'text-slate-400');
+                btn.classList.remove('active');
             });
-            const activeBtn = document.getElementById(`btn-${layer}`);
-            activeBtn.classList.add('active', 'bg-purple-600', 'text-white');
-            activeBtn.classList.remove('bg-slate-800', 'text-slate-400');
+            document.getElementById(`btn-${layer}`).classList.add('active');
 
             if(!chartData) return;
 

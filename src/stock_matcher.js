@@ -1,68 +1,142 @@
 const db = require('./db');
-const { getPalaceAdvice } = require('./ziwei_advice');
+const {
+    STAR_INVESTMENT_GUIDE,
+    PALACE_INVEST_GUIDE,
+    STOCK_MATCH_METHODOLOGY,
+} = require('../public/star_investment_guide.js');
 
-/**
- * 根據使用者的宮位星曜組合，推薦適合的台股標的類型。
- * 邏輯：
- * 1. 取得財帛宮、田宅宮的星曜。
- * 2. 判斷星曜屬性 (例如：武曲-金融/金屬, 太陽-能源/光電, 太陰-房地產/軟體)
- * 3. 匹配對應的台股板塊或特定代碼。
- */
-function matchStocks(palaceData) {
-    // 假設 palaceData 格式為 { 財帛宮: { stars: [...] }, 田宅宮: { stars: [...] } }
-    const wealthStars = palaceData['財帛宮']?.stars || palaceData['財帛']?.stars || [];
-    const propertyStars = palaceData['田宅宮']?.stars || palaceData['田宅']?.stars || [];
-    
-    const combinedStars = [...new Set([...wealthStars, ...propertyStars])];
-    const recommendations = [];
+function normalizePalaceKey(palaceLabel) {
+    if (!palaceLabel) return '財帛';
+    return String(palaceLabel).replace(/宮$/, '');
+}
 
-    // 簡單的匹配邏輯
-    const starToIndustryMap = {
-        '紫微': ['0050', '2330'], // 權重股、龍頭
-        '天機': ['2454', '2317'], // 高科技、組裝
-        '太陽': ['6443', '6477'], // 太陽能、光電、能源
-        '武曲': ['2881', '2882', '2002'], // 金融、鋼鐵
-        '天同': ['2912', '5903'], // 百貨零售、民生
-        '廉貞': ['2408', '2303'], // 半導體、精密電子
-        '天府': ['0056', '2886'], // 配息、穩健、金融
-        '太陰': ['2542', '2412'], // 房產、電信、軟體
-        '貪狼': ['2633', '2707'], // 觀光、數位休閒
-        '巨門': ['2412', '4904'], // 電信、通訊、研究
-        '天相': ['2308', '2382'], // 服務、中介、代工
-        '天梁': ['1760', '4147'], // 醫藥、生技、保險
-        '七殺': ['2603', '2609'], // 航運、鋼鐵、重工
-        '破軍': ['3008', '3406'], // 創新、光學、突破
+function buildMatchEntry(starName, palaceLabel, branch) {
+    const meta = STAR_INVESTMENT_GUIDE[starName];
+    if (!meta) return null;
+    const palaceKey = normalizePalaceKey(palaceLabel);
+    return {
+        palace: palaceKey,
+        palaceDesc: PALACE_INVEST_GUIDE[palaceKey] || '',
+        branch: branch || '',
+        star: starName,
+        starTitle: meta.title,
+        starGlossary: meta.glossary,
+        invest: meta.invest,
+        industries: meta.industries,
+        line: `${palaceKey}宮${branch ? `（${branch}）` : ''}見「${starName}」${meta.title} → ${meta.industries}`,
     };
+}
 
-    const industries = [];
-    combinedStars.forEach(star => {
-        for (let key in starToIndustryMap) {
-            if (star.includes(key)) {
-                industries.push(...starToIndustryMap[key]);
-            }
-        }
+function buildReasonDetail(codeMatches, context) {
+    const {
+        periodLabel = '本命',
+        wealthBranch = '',
+        propertyBranch = '',
+    } = context;
+
+    const uniqueMatches = [];
+    const seen = new Set();
+    codeMatches.forEach((entry) => {
+        const key = `${entry.palace}:${entry.star}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        uniqueMatches.push(entry);
     });
 
-    const uniqueCodes = [...new Set(industries)].slice(0, 5); // 取前五名
-    
+    return {
+        periodLabel,
+        wealthBranch,
+        propertyBranch,
+        matches: uniqueMatches,
+        methodology: STOCK_MATCH_METHODOLOGY,
+    };
+}
+
+/**
+ * 根據財帛／田宅宮星曜推薦台股，並附與排盤室辭典一致的詳細推薦原因
+ */
+function matchStocks(palaceData, context = {}) {
+    const wealthStars = palaceData['財帛宮']?.stars || palaceData['財帛']?.stars || [];
+    const propertyStars = palaceData['田宅宮']?.stars || palaceData['田宅']?.stars || [];
+    const wealthBranch = context.wealthBranch || palaceData['財帛宮']?.branch || palaceData['財帛']?.branch || '';
+    const propertyBranch = context.propertyBranch || palaceData['田宅宮']?.branch || palaceData['田宅']?.branch || '';
+
+    const codeReasons = {};
+    const codeMatchEntries = {};
+
+    const collectMatches = (stars, palaceLabel, branch) => {
+        stars.forEach((starStr) => {
+            const starBase = String(starStr).split(' ')[0].replace(/[祿權科忌]/g, '').trim();
+            for (const [starName, meta] of Object.entries(STAR_INVESTMENT_GUIDE)) {
+                if (!starBase.includes(starName)) continue;
+                const entry = buildMatchEntry(starName, palaceLabel, branch);
+                if (!entry) continue;
+
+                meta.codes.forEach((code) => {
+                    if (!codeReasons[code]) codeReasons[code] = [];
+                    if (!codeReasons[code].includes(entry.line)) {
+                        codeReasons[code].push(entry.line);
+                    }
+                    if (!codeMatchEntries[code]) codeMatchEntries[code] = [];
+                    const dupKey = `${entry.palace}:${entry.star}`;
+                    if (!codeMatchEntries[code].some((e) => `${e.palace}:${e.star}` === dupKey)) {
+                        codeMatchEntries[code].push(entry);
+                    }
+                });
+            }
+        });
+    };
+
+    collectMatches(wealthStars, '財帛', wealthBranch);
+    collectMatches(propertyStars, '田宅', propertyBranch);
+
     const stmt = db.prepare('SELECT code, name FROM tw_stocks WHERE code = ?');
-    
-    if (uniqueCodes.length === 0) {
+
+    if (Object.keys(codeReasons).length === 0) {
         const defaultStock = stmt.get('0050') || { code: '0050', name: '元大台灣50' };
+        const neutralDetail = {
+            periodLabel: context.periodLabel || '本命',
+            wealthBranch,
+            propertyBranch,
+            matches: [],
+            methodology: STOCK_MATCH_METHODOLOGY,
+            neutral: true,
+            neutralReason:
+                '財帛／田宅無明顯主星對應產業。依排盤室指南，此時宜以大盤指數為中性配置參考。',
+        };
         return {
             status: 'neutral',
             reason: '命盤特徵不顯著，建議以大盤指數為主',
-            stocks: [defaultStock]
+            stocks: [{
+                ...defaultStock,
+                reason: '財帛／田宅無明顯主星 → 改推薦大盤型 ETF（與排盤室：星曜不顯著時保守觀望一致）',
+                reasonDetail: neutralDetail,
+            }],
         };
     }
 
-    // 從資料庫查詢名稱
-    const stocks = uniqueCodes.map(code => stmt.get(code)).filter(Boolean);
+    const stocks = Object.keys(codeReasons)
+        .slice(0, 5)
+        .map((code) => {
+            const row = stmt.get(code);
+            if (!row) return null;
+            const reasonDetail = buildReasonDetail(codeMatchEntries[code] || [], {
+                ...context,
+                wealthBranch,
+                propertyBranch,
+            });
+            return {
+                ...row,
+                reason: codeReasons[code].join('；'),
+                reasonDetail,
+            };
+        })
+        .filter(Boolean);
 
     return {
         status: 'matched',
-        reason: '基於財帛宮與田宅宮主星特徵推薦',
-        stocks: stocks
+        reason: '依排盤室辭典：財帛宮（資金運用）與田宅宮（資產庫存）主星定性產業方向',
+        stocks,
     };
 }
 

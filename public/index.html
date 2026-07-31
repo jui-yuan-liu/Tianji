@@ -5,100 +5,126 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tianji 天機 - 會員專區</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/dashboard.css">
     <script src="/app.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-    <style>
-        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
-        .bg-surface { background-color: #1e293b; }
-        .text-gold { color: #f59e0b; }
-    </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body>
     <script src="/nav.js"></script>
 
-    <div id="unauth-view" class="flex-1 flex flex-col items-center justify-center p-8 text-center mt-20">
-        <h1 class="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400">登入天機會員系統</h1>
-        <p class="text-slate-400 mb-8 max-w-md">歡迎來到天機。請登入以存取您的專屬運勢分析、智能排盤與兩年台股投資回測數據。</p>
-        <a href="/login.html" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition transform hover:scale-105">立即登入 / 免費註冊</a>
-    </div>
+    <div class="dash-content">
+        <div id="unauth-view" class="dash-hero">
+            <h1 class="dash-hero-title">天機會員系統</h1>
+            <p class="dash-hero-desc">登入以存取運勢分析、智能排盤與投資回測。</p>
+            <a href="/login.html" class="dash-btn dash-btn-primary">登入 / 註冊</a>
+        </div>
 
-    <div id="auth-view" class="hidden flex-1 max-w-7xl mx-auto p-4 lg:p-8 w-full">
-        <!-- Dashboard Header removed -->
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Left: Daily Fortune -->
-            <div class="lg:col-span-1 space-y-8">
-                <div class="bg-surface rounded-2xl p-6 border border-slate-700 shadow-xl">
-                    <h3 class="text-xl font-bold text-slate-200 mb-4 flex items-center border-b border-slate-700 pb-2">
-                        <span class="w-1 h-6 bg-gold rounded mr-2"></span> 今日運勢分析
-                    </h3>
-                    <div id="daily-loading" class="text-slate-500 text-center py-8">
-                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mx-auto mb-2"></div>
-                        分析運算中...
-                    </div>
-                    <div id="daily-content" class="hidden">
-                        <div class="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-600 mb-4">
-                            <span class="text-slate-300 font-bold">綜合運勢評分</span>
-                            <span id="d-score" class="text-3xl font-bold">--</span>
-                        </div>
-                        <div class="space-y-3 text-sm">
-                            <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
-                                <div class="text-xs text-slate-500 mb-1">財帛宮星象</div>
-                                <div id="d-stars" class="font-bold text-purple-300">--</div>
-                            </div>
-                            <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
-                                <div class="text-xs text-slate-500 mb-1">今日四化</div>
-                                <div id="d-trans" class="font-bold text-gold">--</div>
-                            </div>
-                            <div class="p-4 bg-indigo-900/30 border border-indigo-500/30 rounded text-slate-300 leading-relaxed" id="d-desc">--</div>
-                            <div class="p-4 bg-amber-900/30 border border-amber-500/30 rounded text-amber-200 font-bold" id="d-strat">--</div>
-                            <div id="d-stocks-container" class="hidden">
-                                <div class="text-xs text-slate-500 mb-2 border-b border-slate-700 pb-1">標籤匹配推薦</div>
-                                <div id="d-stocks" class="flex flex-wrap gap-2 mb-4"></div>
-                                <div class="text-xs text-slate-500 mb-2 border-b border-slate-700 pb-1">命盤共振精選 (Top 10)</div>
-                                <div id="d-resonance" class="space-y-2"></div>
-                            </div>
-                        </div>
-                    </div>
+        <div id="auth-view" class="hidden">
+            <!-- KPI Header -->
+            <div class="dash-kpi-grid" id="kpi-row">
+                <div class="dash-kpi">
+                    <div class="dash-kpi-label">綜合運勢</div>
+                    <div class="dash-kpi-value" id="kpi-score">--</div>
+                    <div class="dash-kpi-sub">今日評分</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi-label">AI 建議</div>
+                    <div class="dash-kpi-value sm" id="kpi-action">--</div>
+                    <div class="dash-kpi-sub">模型判斷</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi-label">大盤</div>
+                    <div class="dash-kpi-value sm" id="kpi-market">TAIEX</div>
+                    <div class="dash-kpi-sub">即時走勢</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi-label">會員</div>
+                    <div class="dash-kpi-value sm" id="kpi-user">--</div>
+                    <div class="dash-kpi-sub" id="kpi-date">--</div>
                 </div>
             </div>
 
-            <!-- Right: Chart & Backtest -->
-            <div class="lg:col-span-2 space-y-8">
-                    <div class="bg-surface rounded-2xl p-6 border border-slate-700 shadow-xl">
-                        <h3 class="text-xl font-bold text-slate-200 mb-4 flex justify-between items-center border-b border-slate-700 pb-2">
-                            <div class="flex items-center">
-                                <span class="w-1 h-6 bg-purple-500 rounded mr-2"></span> 今日 AI 實戰推論建議
+            <div class="dash-layout dash-layout-1-2">
+                <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title">今日運勢</div>
+                        </div>
+                        <div id="daily-loading" class="dash-loading">
+                            <div class="dash-spinner"></div>
+                            分析運算中...
+                        </div>
+                        <div id="daily-content" class="hidden">
+                            <div class="dash-panel flex justify-between items-center mb-4">
+                                <span style="color: var(--text-secondary); font-weight: 600;">綜合運勢評分</span>
+                                <span id="d-score" class="text-3xl font-bold">--</span>
                             </div>
-                            <div class="flex items-center text-sm">
-                                <span class="text-slate-400 mr-2">選擇模型:</span>
-                                <select id="model-selector" class="bg-slate-700 text-white border border-slate-600 rounded px-2 py-1 focus:outline-none focus:border-purple-500 transition">
-                                    <option value="static">靜態命理策略 (預設)</option>
-                                </select>
+                            <div class="space-y-3 text-sm">
+                                <div class="dash-panel">
+                                    <div class="text-xs mb-1" style="color: var(--text-muted)">財帛宮星象</div>
+                                    <div id="d-stars" class="font-bold" style="color: #c4b5fd">--</div>
+                                </div>
+                                <div class="dash-panel">
+                                    <div class="text-xs mb-1" style="color: var(--text-muted)">今日四化</div>
+                                    <div id="d-trans" class="font-bold text-gold">--</div>
+                                </div>
+                                <div class="dash-panel-highlight" id="d-desc" style="color: var(--text-secondary); line-height: 1.7;">--</div>
+                                <div class="dash-panel-warning font-bold" id="d-strat">--</div>
+                                <div id="d-stocks-container" class="hidden space-y-5">
+                                    <section id="d-stocks-natal-section">
+                                        <div class="text-sm font-semibold mb-1" style="color: var(--text-primary)">本命盤推薦</div>
+                                        <div id="d-natal-palace-info" class="text-[10px] mb-2" style="color: var(--text-muted)"></div>
+                                        <div class="text-xs mb-2 pb-1" style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle)">標籤匹配</div>
+                                        <div id="d-stocks-natal" class="flex flex-wrap gap-2"></div>
+                                    </section>
+                                    <section id="d-stocks-flow-section" class="pt-3" style="border-top: 1px solid var(--border-subtle)">
+                                        <div class="text-sm font-semibold mb-2" style="color: var(--text-primary)">流運盤推薦</div>
+                                        <div class="flow-period-switcher">
+                                            <button type="button" id="flow-prev" class="dash-btn-icon" aria-label="上一個流運">‹</button>
+                                            <span id="flow-period-label" class="flow-period-label">流日推薦</span>
+                                            <button type="button" id="flow-next" class="dash-btn-icon" aria-label="下一個流運">›</button>
+                                        </div>
+                                        <div id="d-flow-palace-info" class="text-[10px] mb-2" style="color: var(--text-muted)"></div>
+                                        <div class="text-xs mb-2 pb-1" style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle)">標籤匹配</div>
+                                        <div id="d-stocks-flow" class="flex flex-wrap gap-2 mb-3"></div>
+                                        <div class="text-xs mb-2 pb-1" style="color: var(--text-muted); border-bottom: 1px solid var(--border-subtle)">命盤共振精選 (Top 10)</div>
+                                        <div id="d-resonance-flow" class="space-y-2"></div>
+                                    </section>
+                                </div>
                             </div>
-                        </h3>
-                        <div class="flex flex-col space-y-4">
-                            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-600">
-                                <span class="text-slate-400">當前模型判斷動作：</span>
-                                <span id="ai-today-action" class="text-2xl font-bold text-slate-500 animate-pulse">計算中...</span>
+                        </div>
+                    </div>
+
+                <div class="dash-stack">
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title">AI 推論建議</div>
+                            <div class="dash-card-actions">
+                                <span style="color:var(--text-muted);font-size:0.75rem">模型</span>
+                                <select id="model-selector" class="dash-select dash-btn-sm"></select>
                             </div>
-                            <div class="bg-indigo-900/30 p-4 rounded-xl border border-indigo-500/30">
-                                <h4 class="text-sm text-slate-400 mb-2 font-bold">推論依據與可解釋性 (Explainability)</h4>
-                                <p id="ai-today-reason" class="text-slate-300 leading-relaxed text-sm mb-4">載入中...</p>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="dash-panel flex justify-between items-center">
+                                <span style="color: var(--text-muted)">當前模型判斷動作</span>
+                                <span id="ai-today-action" class="text-2xl font-bold animate-pulse" style="color: var(--text-muted)">計算中...</span>
+                            </div>
+                            <div class="dash-panel-highlight">
+                                <h4 class="text-sm font-medium mb-2" style="color:var(--text-muted)">推論依據</h4>
+                                <p id="ai-today-reason" class="text-sm mb-4" style="color: var(--text-secondary); line-height: 1.7">載入中...</p>
                                 <div id="shap-container" class="hidden">
-                                    <h5 class="text-xs text-slate-400 mb-2 border-b border-indigo-500/30 pb-1">決策因子影響力 (Factor Contributions)</h5>
+                                    <h5 class="text-xs mb-2 pb-1 font-bold" style="color: var(--text-muted); border-bottom: 1px solid var(--border-accent)">決策因子影響力</h5>
                                     <div id="shap-bars" class="space-y-1"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                <!-- Market Chart -->
-                <div class="bg-surface rounded-2xl p-6 border border-slate-700 shadow-xl">
-                    <h3 class="text-xl font-bold text-slate-200 mb-4 flex items-center border-b border-slate-700 pb-2">
-                        <span class="w-1 h-6 bg-blue-500 rounded mr-2"></span> 大盤趨勢 (TAIEX)
-                    </h3>
-                    <div id="chart-container" class="w-full h-[400px] rounded-lg overflow-hidden border border-slate-600"></div>
+                    <div class="dash-card">
+                        <div class="dash-card-header">
+                            <div class="dash-card-title">大盤趨勢 · TAIEX</div>
+                        </div>
+                        <div id="chart-container" class="dash-chart-box dash-chart-box--tall"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -107,135 +133,339 @@
     <script>
         let chart;
         let candlestickSeries;
+        let currentModelId = 'latest';
+
+        let flowPeriodIndex = 2;
+        let flowPeriodsData = null;
+        let flowTargetDate = '';
+        const FLOW_PERIOD_KEYS = ['annual', 'monthly', 'daily'];
+        const FLOW_PERIOD_LABELS = ['流年', '流月', '流日'];
+        let stockTooltipEl = null;
+
+        function escapeAttr(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;');
+        }
+
+        function escapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function formatStockTooltipHtml(stock, matched) {
+            const detail = stock.reasonDetail;
+            if (!detail) {
+                const fallback = stock.reason || matched?.reason || '依排盤室辭典：財帛宮與田宅宮主星定性產業方向';
+                return `<div class="stock-tip-summary">${escapeHtml(fallback)}</div>`;
+            }
+
+            let html = `<div class="stock-tip-title">${escapeHtml(detail.periodLabel)} · 標籤匹配</div>`;
+            html += `<div class="stock-tip-meta">財帛（${escapeHtml(detail.wealthBranch)}）· 田宅（${escapeHtml(detail.propertyBranch)}）</div>`;
+
+            if (detail.neutral) {
+                html += `<div class="stock-tip-block stock-tip-neutral">${escapeHtml(detail.neutralReason)}</div>`;
+            } else {
+                (detail.matches || []).forEach((m) => {
+                    html += `<div class="stock-tip-block">`;
+                    html += `<div class="stock-tip-palace">${escapeHtml(m.palace)}宮${m.branch ? `（${escapeHtml(m.branch)}）` : ''}</div>`;
+                    html += `<div class="stock-tip-palace-desc">${escapeHtml(m.palaceDesc)}</div>`;
+                    html += `<div class="stock-tip-star"><span class="stock-tip-star-name">${escapeHtml(m.star)}</span> ${escapeHtml(m.starTitle)}</div>`;
+                    html += `<div class="stock-tip-glossary">${escapeHtml(m.starGlossary)}</div>`;
+                    html += `<div class="stock-tip-invest"><span>投資取向：</span>${escapeHtml(m.invest)}</div>`;
+                    html += `<div class="stock-tip-industry"><span>產業方向：</span>${escapeHtml(m.industries)}</div>`;
+                    html += `</div>`;
+                });
+            }
+
+            if (detail.methodology) {
+                html += `<div class="stock-tip-foot">${escapeHtml(detail.methodology)}</div>`;
+            }
+            return html;
+        }
+
+        function positionStockTooltip(tip, clientX, clientY) {
+            const pad = 14;
+            let left = clientX + pad;
+            let top = clientY + pad;
+            tip.style.left = `${left}px`;
+            tip.style.top = `${top}px`;
+            const rect = tip.getBoundingClientRect();
+            if (left + rect.width > window.innerWidth - 8) {
+                left = Math.max(8, clientX - rect.width - pad);
+            }
+            if (top + rect.height > window.innerHeight - 8) {
+                top = Math.max(8, clientY - rect.height - pad);
+            }
+            tip.style.left = `${left}px`;
+            tip.style.top = `${top}px`;
+        }
+
+        function ensureStockTooltip() {
+            if (!stockTooltipEl) {
+                stockTooltipEl = document.createElement('div');
+                stockTooltipEl.id = 'stock-rec-tooltip';
+                stockTooltipEl.className = 'stock-rec-tooltip';
+                document.body.appendChild(stockTooltipEl);
+            }
+            return stockTooltipEl;
+        }
+
+        function bindStockTagTooltips(container) {
+            if (!container) return;
+            const tip = ensureStockTooltip();
+            container.querySelectorAll('.stock-rec-tag').forEach((tag) => {
+                tag.addEventListener('mouseenter', () => {
+                    const detailRaw = tag.getAttribute('data-detail');
+                    let html = '';
+                    if (detailRaw) {
+                        try {
+                            const stock = { reasonDetail: JSON.parse(detailRaw) };
+                            html = formatStockTooltipHtml(stock, null);
+                        } catch (e) {
+                            html = `<div class="stock-tip-summary">${escapeHtml(tag.getAttribute('data-tip') || '')}</div>`;
+                        }
+                    } else {
+                        html = `<div class="stock-tip-summary">${escapeHtml(tag.getAttribute('data-tip') || '')}</div>`;
+                    }
+                    if (!html.trim()) return;
+                    tip.innerHTML = html;
+                    tip.classList.add('visible');
+                });
+                tag.addEventListener('mousemove', (e) => {
+                    positionStockTooltip(tip, e.clientX, e.clientY);
+                });
+                tag.addEventListener('mouseleave', () => {
+                    tip.classList.remove('visible');
+                    tip.innerHTML = '';
+                });
+            });
+        }
+
+        function renderStockTags(containerId, matched) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const stocks = matched?.stocks || [];
+            if (stocks.length === 0) {
+                el.innerHTML = '<span class="text-xs" style="color:var(--text-muted)">暫無匹配標的</span>';
+                return;
+            }
+            el.innerHTML = stocks.map((s) => {
+                const reason = escapeAttr(s.reason || matched?.reason || '依排盤室辭典推薦');
+                const detail = s.reasonDetail ? escapeAttr(JSON.stringify(s.reasonDetail)) : '';
+                return `<span class="dash-badge tag stock-rec-tag" data-tip="${reason}" data-detail="${detail}">${s.code} ${s.name}</span>`;
+            }).join('');
+            bindStockTagTooltips(el);
+        }
+
+        function renderResonanceList(containerId, resonance) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const list = resonance || [];
+            if (list.length === 0) {
+                el.innerHTML = '<div class="text-xs" style="color:var(--text-muted)">暫無共振標的（請確認股票資料已同步）</div>';
+                return;
+            }
+            el.innerHTML = list.map(s => `
+                <div class="dash-panel">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-gold font-bold text-xs">${s.code} ${s.name}</span>
+                        <span class="text-[10px]" style="color:var(--text-muted)">契合度: ${s.score}</span>
+                    </div>
+                    <div class="text-[10px] leading-tight" style="color:var(--text-muted)">
+                        ${s.reasons.map(r => `• ${r}`).join('<br>')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderPalaceInfo(elId, rec, extra = '') {
+            const el = document.getElementById(elId);
+            if (!el || !rec) return;
+            const fmt = (stars) => (stars && stars.length > 0 ? stars.join('、') : '空宮');
+            el.textContent = `財帛（${rec.wealthBranch}宮）${fmt(rec.wealthStars)} · 田宅（${rec.propertyBranch}宮）${fmt(rec.propertyStars)}${extra}`;
+        }
+
+        function renderFlowPeriod(index) {
+            if (!flowPeriodsData) return;
+            const key = FLOW_PERIOD_KEYS[index];
+            const data = flowPeriodsData[key];
+            if (!data) return;
+
+            const labelEl = document.getElementById('flow-period-label');
+            if (labelEl) labelEl.textContent = `${FLOW_PERIOD_LABELS[index]}推薦`;
+
+            const extra = ` · ${data.periodLabel || FLOW_PERIOD_LABELS[index]}命宮${data.lifeBranch}宮`;
+            const dateSuffix = flowTargetDate ? `（${flowTargetDate}）` : '';
+            renderPalaceInfo('d-flow-palace-info', data, extra + dateSuffix);
+            renderStockTags('d-stocks-flow', data.matchedStocks);
+            renderResonanceList('d-resonance-flow', data.resonanceStocks);
+        }
+
+        function initFlowSwitcher() {
+            const prev = document.getElementById('flow-prev');
+            const next = document.getElementById('flow-next');
+            if (!prev || !next) return;
+            prev.onclick = () => {
+                flowPeriodIndex = (flowPeriodIndex + FLOW_PERIOD_KEYS.length - 1) % FLOW_PERIOD_KEYS.length;
+                renderFlowPeriod(flowPeriodIndex);
+            };
+            next.onclick = () => {
+                flowPeriodIndex = (flowPeriodIndex + 1) % FLOW_PERIOD_KEYS.length;
+                renderFlowPeriod(flowPeriodIndex);
+            };
+        }
+
+        function hasFlowData(flow) {
+            if (!flow?.periods) return false;
+            return FLOW_PERIOD_KEYS.some((key) => {
+                const p = flow.periods[key];
+                return (p?.matchedStocks?.stocks?.length > 0) || (p?.resonanceStocks?.length > 0);
+            });
+        }
+
+        function renderStockRecommendations(calcData) {
+            const recs = calcData.strategy?.stockRecommendations;
+            if (!recs) return;
+
+            const natal = recs.natal;
+            const flow = recs.flow;
+            const hasNatal = (natal?.matchedStocks?.stocks?.length > 0);
+            const hasFlow = hasFlowData(flow);
+
+            if (!hasNatal && !hasFlow) return;
+
+            document.getElementById('d-stocks-container').classList.remove('hidden');
+            renderPalaceInfo('d-natal-palace-info', natal);
+            renderStockTags('d-stocks-natal', natal?.matchedStocks);
+
+            const flowSection = document.getElementById('d-stocks-flow-section');
+            if (flowSection) flowSection.classList.toggle('hidden', !hasFlow);
+
+            if (hasFlow && flow.periods) {
+                flowPeriodsData = flow.periods;
+                flowTargetDate = flow.targetLunarDate || '';
+                initFlowSwitcher();
+                renderFlowPeriod(flowPeriodIndex);
+            }
+        }
 
         async function initDashboard() {
             const user = await fetchMe();
             if (!user) {
                 document.getElementById('unauth-view').classList.remove('hidden');
                 document.getElementById('auth-view').classList.add('hidden');
+                document.getElementById('kpi-row')?.classList.add('hidden');
                 return;
             }
 
             document.getElementById('unauth-view').classList.add('hidden');
             document.getElementById('auth-view').classList.remove('hidden');
 
-            // Setup Chart
+            document.getElementById('kpi-user').textContent = user.realName || user.username;
+            document.getElementById('kpi-date').textContent = new Date().toLocaleDateString('zh-TW');
+
             chart = LightweightCharts.createChart(document.getElementById('chart-container'), {
-                layout: { background: { type: 'solid', color: '#0f172a' }, textColor: '#cbd5e1' },
-                grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+                layout: { background: { type: 'solid', color: '#0f172a' }, textColor: '#64748b' },
+                grid: { vertLines: { color: 'rgba(248,250,252,0.04)' }, horzLines: { color: 'rgba(248,250,252,0.04)' } },
                 crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-                timeScale: { borderColor: '#334155' },
-                rightPriceScale: { borderColor: '#334155' }
+                timeScale: { borderColor: 'rgba(248,250,252,0.06)' },
+                rightPriceScale: { borderColor: 'rgba(248,250,252,0.06)' },
+                width: document.getElementById('chart-container').clientWidth,
+                height: document.getElementById('chart-container').clientHeight,
             });
             candlestickSeries = chart.addCandlestickSeries({
-                upColor: '#ef4444', downColor: '#10b981', borderUpColor: '#ef4444', borderDownColor: '#10b981', wickUpColor: '#ef4444', wickDownColor: '#10b981'
+                upColor: '#ef4444', downColor: '#22c55e',
+                borderUpColor: '#ef4444', borderDownColor: '#22c55e',
+                wickUpColor: '#ef4444', wickDownColor: '#22c55e'
             });
 
-            // Fetch Market Data
             await fetch('/api/market-data').then(r => r.json()).then(data => {
-                if(data && data.length > 0) {
+                if (data && data.length > 0) {
                     candlestickSeries.setData(data);
                     chart.timeScale().fitContent();
+                    const last = data[data.length - 1];
+                    if (last) document.getElementById('kpi-market').textContent = last.close?.toLocaleString() || 'TAIEX';
                 }
             });
 
             await fetchModelsAndRun(user);
 
-
-            // Fetch Daily Fortune
             const today = new Date().toISOString().split('T')[0];
             fetch(`/api/daily-fortune?date=${today}&birthYear=${user.birthYear}&birthMonth=${user.birthMonth}&birthDay=${user.birthDay}&birthHour=${user.birthHour}`)
                 .then(r => r.json()).then(data => {
                     document.getElementById('daily-loading').classList.add('hidden');
+                    if (!data.user?.advice) {
+                        document.getElementById('daily-content').classList.remove('hidden');
+                        document.getElementById('d-desc').innerText = data.error || '無法載入今日運勢，請稍後再試。';
+                        return;
+                    }
                     document.getElementById('daily-content').classList.remove('hidden');
-                    
+
                     const adv = data.user.advice;
                     const elScore = document.getElementById('d-score');
+                    const kpiScore = document.getElementById('kpi-score');
                     elScore.innerText = adv.score;
-                    elScore.className = `text-3xl font-bold ${adv.score >= 60 ? 'text-green-400' : (adv.score <= 40 ? 'text-red-400' : 'text-yellow-400')}`;
-                    
+                    kpiScore.innerText = adv.score;
+                    const scoreColor = adv.score >= 60 ? 'var(--success)' : (adv.score <= 40 ? 'var(--danger)' : 'var(--primary)');
+                    elScore.style.color = scoreColor;
+                    kpiScore.style.color = scoreColor;
+
                     document.getElementById('d-stars').innerText = data.user.daily.wealthStars.join(', ');
-                    document.getElementById('d-trans').innerHTML = `<span class="text-green-400">祿:${data.user.daily.lu}</span> | <span class="text-red-400">忌:${data.user.daily.ji}</span>`;
+                    document.getElementById('d-trans').innerHTML = `<span style="color:var(--success)">祿:${data.user.daily.lu}</span> · <span style="color:var(--danger)">忌:${data.user.daily.ji}</span>`;
                     document.getElementById('d-desc').innerText = adv.details;
                     document.getElementById('d-strat').innerText = `【策略】${adv.strategy}`;
 
-                    // Fetch Natal matched stocks
                     fetch('/api/calculate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            year: user.birthYear, 
-                            month: user.birthMonth, 
-                            day: user.birthDay, 
-                            hour: user.birthHour 
+                        body: JSON.stringify({
+                            year: user.birthYear, month: user.birthMonth,
+                            day: user.birthDay, hour: user.birthHour,
+                            targetDate: today
                         })
                     }).then(r => r.json()).then(calcData => {
-                        const matched = calcData.strategy.matchedStocks;
-                        const resonance = calcData.strategy.resonanceStocks;
-                        
-                        if ((matched && matched.stocks && matched.stocks.length > 0) || (resonance && resonance.length > 0)) {
-                            const container = document.getElementById('d-stocks-container');
-                            container.classList.remove('hidden');
-
-                            if (matched && matched.stocks) {
-                                document.getElementById('d-stocks').innerHTML = matched.stocks.map(s => `
-                                    <span class="px-2 py-1 bg-blue-900/50 border border-blue-500/30 rounded text-blue-300 text-xs">
-                                        ${s.code} ${s.name}
-                                    </span>
-                                `).join('');
-                            }
-
-                            if (resonance) {
-                                document.getElementById('d-resonance').innerHTML = resonance.map(s => `
-                                    <div class="p-2 bg-slate-800 rounded border border-slate-700">
-                                        <div class="flex justify-between items-center mb-1">
-                                            <span class="text-gold font-bold text-xs">${s.code} ${s.name}</span>
-                                            <span class="text-[10px] text-slate-500">契合度: ${s.score}</span>
-                                        </div>
-                                        <div class="text-[10px] text-slate-400 leading-tight">
-                                            ${s.reasons.map(r => `• ${r}`).join('<br>')}
-                                        </div>
-                                    </div>
-                                `).join('');
-                            }
+                        if (calcData.error) {
+                            console.error('Calculate API error:', calcData.error);
+                            return;
                         }
-                    });
+                        renderStockRecommendations(calcData);
+                    }).catch(err => console.error('Stock recommendation fetch failed', err));
+                }).catch(err => {
+                    console.error('Daily fortune fetch failed', err);
+                    document.getElementById('daily-loading').classList.add('hidden');
+                    document.getElementById('daily-content').classList.remove('hidden');
+                    document.getElementById('d-desc').innerText = '無法載入今日運勢，請稍後再試。';
                 });
-        } // close initDashboard
-            
-                let currentModelId = 'latest';
+        }
 
         async function fetchModelsAndRun(user) {
             try {
                 const token = localStorage.getItem('tianji_token');
-                const res = await fetch('/api/models', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const res = await fetch('/api/models', { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
-                
                 const selector = document.getElementById('model-selector');
                 selector.innerHTML = '<option value="static">靜態命理策略 (預設)</option>';
 
-                if (data.models && data.models.length > 0) {
+                if (data.models?.length > 0) {
                     data.models.forEach(model => {
                         const opt = document.createElement('option');
                         opt.value = model.id;
-                        opt.textContent = `AI 模型 - ${model.name || model.id.substring(0,8)} (ROI: ${model.roi || 'N/A'}%)`;
+                        opt.textContent = `AI - ${model.name || model.id.substring(0, 8)} (ROI: ${model.roi || 'N/A'}%)`;
                         selector.appendChild(opt);
                     });
                     currentModelId = data.models[0].id;
                 } else {
                     currentModelId = 'static';
                 }
-                
                 selector.value = currentModelId;
-                
-                // Add event listener for selection change
                 selector.addEventListener('change', (e) => {
                     currentModelId = e.target.value;
                     runBacktestData(user);
                 });
-
             } catch (e) {
                 console.error('Fetch models failed', e);
                 currentModelId = 'static';
@@ -243,45 +473,44 @@
             runBacktestData(user);
         }
 
+        function setActionDisplay(signal) {
+            const actionEl = document.getElementById('ai-today-action');
+            const kpiAction = document.getElementById('kpi-action');
+            actionEl.innerText = signal;
+            kpiAction.innerText = signal;
+            const cls = signal === 'BUY' ? 'dash-badge buy' : signal === 'SELL' ? 'dash-badge sell' : 'dash-badge hold';
+            actionEl.className = `text-2xl font-bold ${signal === 'BUY' ? '' : ''}`;
+            actionEl.style.color = signal === 'BUY' ? 'var(--success)' : signal === 'SELL' ? 'var(--danger)' : 'var(--text-muted)';
+            kpiAction.style.color = actionEl.style.color;
+        }
+
         async function runBacktestData(user) {
-            document.getElementById('ai-today-action').innerText = '計算中...';
-            document.getElementById('ai-today-action').className = 'text-2xl font-bold text-slate-500 animate-pulse';
+            setActionDisplay('...');
+            document.getElementById('ai-today-action').classList.add('animate-pulse');
             document.getElementById('ai-today-reason').innerText = '載入中...';
-            
+
             fetch(`/api/backtest?userId=${user.id}&modelId=${currentModelId}&birthYear=${user.birthYear}&birthMonth=${user.birthMonth}&birthDay=${user.birthDay}&birthHour=${user.birthHour}`)
                 .then(r => r.json()).then(data => {
                     const lastSignal = data.lastSignal || 'HOLD';
                     const lastReason = data.lastReason || '無法取得可解釋性分析。';
-                    const actionEl = document.getElementById('ai-today-action');
-                    if(actionEl) {
-                        actionEl.innerText = lastSignal;
-                        actionEl.className = `text-2xl font-bold ${lastSignal === 'BUY' ? 'text-green-400' : (lastSignal === 'SELL' ? 'text-red-400' : 'text-slate-400')}`;
-                    }
-                    const reasonEl = document.getElementById('ai-today-reason');
-                    if(reasonEl) {
-                        reasonEl.innerText = lastReason;
-                    }
+                    document.getElementById('ai-today-action').classList.remove('animate-pulse');
+                    setActionDisplay(lastSignal);
+                    document.getElementById('ai-today-reason').innerText = lastReason;
 
                     const shapContainer = document.getElementById('shap-container');
                     const shapBars = document.getElementById('shap-bars');
-                    if (data.lastFactors && data.lastFactors.length > 0) {
+                    if (data.lastFactors?.length > 0) {
                         shapContainer.classList.remove('hidden');
                         shapBars.innerHTML = data.lastFactors.map(f => {
                             const isPositive = f.value >= 0;
                             const width = Math.min(Math.abs(f.value) * 100, 100);
-                            const colorClass = isPositive ? 'bg-green-500' : 'bg-red-500';
-                            
-                            return `
-                            <div class="flex items-center text-xs">
-                                <div class="w-1/3 text-right pr-2 text-slate-400 truncate">${f.name}</div>
+                            const color = isPositive ? '#22c55e' : '#ef4444';
+                            return `<div class="flex items-center text-xs">
+                                <div class="w-1/3 text-right pr-2 truncate" style="color:var(--text-muted)">${f.name}</div>
                                 <div class="w-2/3 flex items-center">
-                                    <div class="w-1/2 flex justify-end pr-1">
-                                        ${!isPositive ? `<div class="${colorClass} h-1.5 rounded-l" style="width: ${width}%"></div>` : ''}
-                                    </div>
-                                    <div class="w-[1px] h-3 bg-slate-500"></div>
-                                    <div class="w-1/2 flex justify-start pl-1">
-                                        ${isPositive ? `<div class="${colorClass} h-1.5 rounded-r" style="width: ${width}%"></div>` : ''}
-                                    </div>
+                                    <div class="w-1/2 flex justify-end pr-1">${!isPositive ? `<div style="width:${width}%;height:6px;background:${color};border-radius:3px 0 0 3px"></div>` : ''}</div>
+                                    <div style="width:1px;height:12px;background:var(--border-default)"></div>
+                                    <div class="w-1/2 flex justify-start pl-1">${isPositive ? `<div style="width:${width}%;height:6px;background:${color};border-radius:0 3px 3px 0"></div>` : ''}</div>
                                 </div>
                             </div>`;
                         }).join('');
@@ -289,37 +518,31 @@
                         shapContainer.classList.add('hidden');
                     }
 
-                    if (data.markers && data.markers.length > 0 && candlestickSeries) {
-                        const sortedMarkers = data.markers
-                            .filter(m => m.time)
-                            .map(m => ({
-                                time: m.time,
-                                position: m.position,
-                                color: m.color,
-                                shape: m.shape,
-                                text: m.text
-                            }))
-                            .sort((a, b) => new Date(a.time) - new Date(b.time));
-                            
+                    if (data.markers?.length > 0 && candlestickSeries) {
                         const uniqueMarkers = [];
                         const seenTimes = new Set();
-                        for (const marker of sortedMarkers) {
-                            if (!seenTimes.has(marker.time)) {
-                                seenTimes.add(marker.time);
-                                uniqueMarkers.push(marker);
-                            }
-                        }
+                        data.markers.filter(m => m.time).map(m => ({
+                            time: m.time, position: m.position, color: m.color, shape: m.shape, text: m.text
+                        })).sort((a, b) => new Date(a.time) - new Date(b.time))
+                        .forEach(m => { if (!seenTimes.has(m.time)) { seenTimes.add(m.time); uniqueMarkers.push(m); } });
                         candlestickSeries.setMarkers(uniqueMarkers);
                     } else if (candlestickSeries) {
                         candlestickSeries.setMarkers([]);
                     }
                 }).catch(err => {
-                    console.error("Backtest chart update failed", err);
-                    document.getElementById('ai-today-action').innerText = '無信號';
-                    document.getElementById('ai-today-action').className = 'text-2xl font-bold text-slate-500';
+                    console.error('Backtest chart update failed', err);
+                    document.getElementById('ai-today-action').classList.remove('animate-pulse');
+                    setActionDisplay('無信號');
                     document.getElementById('ai-today-reason').innerText = '獲取數據失敗。';
                 });
         }
+
+        window.resizeDashboardCharts = function () {
+            const el = document.getElementById('chart-container');
+            if (chart && el) {
+                chart.applyOptions({ width: el.clientWidth, height: el.clientHeight });
+            }
+        };
 
         window.addEventListener('DOMContentLoaded', initDashboard);
     </script>

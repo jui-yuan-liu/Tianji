@@ -9,15 +9,15 @@ const { Solar, Lunar } = require('lunar-javascript');
 // Import Core Logic
 // getFullPalaceMapping is missing in require because I edited the file but not updated require here fully yet.
 // Wait, I just edited the require line in previous step. Let's use it.
-const { PALACES, calculateLifePalace, calculateWealthPalace, calculateFortunePalace, getInvestmentStrategy, getFullPalaceMapping } = require('./src/ziwei_core');
+const { PALACES, calculateLifePalace, calculateWealthPalace, calculateFortunePalace, getInvestmentStrategy, getFullPalaceMapping, hourToBranchIndex, getStarPlacementLunarDay } = require('./src/ziwei_core');
 const { getFiveElementBureau, getZiWeiStarPosition, getTianFuStarPosition, getLifePalaceStemBranch, getAllMajorStars } = require('./src/ziwei_stars');
-const { getAnnualTransformations, getAnnualLifePalace } = require('./src/ziwei_annual');
-const { getDecadeLifePalace, getMonthlyLifePalace, getDailyLifePalace, getTimeTransformations } = require('./src/ziwei_periods');
-const { getPalaceAdvice } = require('./src/ziwei_advice'); // Advice Module
+const { resolveHoroscope } = require('./src/ziwei_horoscope');
+const { getPalaceAdvice } = require('./src/ziwei_advice');
 const { matchStocks } = require('./src/stock_matcher'); // Stock Matcher Module
 const { recommendResonanceStocks } = require('./src/resonance_engine'); // Resonance Engine
 const { runBacktest } = require('./src/backtest'); // Backtest Module
 const { trainModel } = require('./src/rl_train'); // RL Training Module
+const { getFeatureCatalogForUI, parseFeatureConfig, getStateSize, getMarketDim } = require('./src/rl_features');
 const { registerUser, loginUser, authenticateToken, getUserProfile } = require('./src/auth');
 
 const app = express();
@@ -25,6 +25,7 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
+app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
 // Logger
 app.use((req, res, next) => {
@@ -158,7 +159,7 @@ app.post('/api/calculate', (req, res) => {
         const lunar = solar.getLunar();
         const lunarMonth = lunar.getMonth();
         const lunarDay = lunar.getDay();
-        const birthHour = parseInt(hour);
+        const hourBranchIdx = hourToBranchIndex(hour);
         const yearGan = lunar.getYearGan();
         const yearGanIndex = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"].indexOf(yearGan);
 
@@ -169,7 +170,7 @@ app.post('/api/calculate', (req, res) => {
         const targetLunarDay = targetLunar.getDay();
 
         // 2. Natal Chart
-        const lifePalaceIdx = calculateLifePalace(lunarMonth, birthHour);
+        const lifePalaceIdx = calculateLifePalace(lunarMonth, hourBranchIdx);
         // Get Full Palace Names Mapping
         const palaceMapping = getFullPalaceMapping ? getFullPalaceMapping(lifePalaceIdx) : {};
         if (!getFullPalaceMapping) {
@@ -183,33 +184,32 @@ app.post('/api/calculate', (req, res) => {
         const fortunePalaceIdx = calculateFortunePalace(wealthPalaceIdx);
         
         const fiveElementBureau = getFiveElementBureau(yearGanIndex, lifePalaceIdx);
-        const ziWeiPos = getZiWeiStarPosition(fiveElementBureau, lunarDay);
+        const starLunarDay = getStarPlacementLunarDay(solar, hourBranchIdx);
+        const ziWeiPos = getZiWeiStarPosition(fiveElementBureau, starLunarDay);
         const tianFuPos = getTianFuStarPosition(ziWeiPos);
         const allStars = getAllMajorStars(ziWeiPos, tianFuPos);
 
-        // 3. Periods
-        // Annual
-        const targetYearStemIdx = (currentYear - 4) % 10;
-        const targetYearBranchIdx = (currentYear - 4) % 12;
-        const targetYearStem = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"][targetYearStemIdx];
-        const targetYearBranch = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"][targetYearBranchIdx];
-        const annualTrans = getAnnualTransformations(targetYearStem);
-        const annualLifePos = getAnnualLifePalace(targetYearBranchIdx);
-
-        // Decade
-        const age = currentYear - parseInt(year) + 1;
-        const decadeLifePos = getDecadeLifePalace(lifePalaceIdx, fiveElementBureau, age);
-        const decadeStemIdx = (fiveElementBureau + decadeLifePos) % 10; 
-        const decadeStem = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"][decadeStemIdx];
-        const decadeTrans = getTimeTransformations(decadeStem);
-
-        // Monthly
-        const monthlyTrans = getTimeTransformations("甲"); // Simplified
-        const monthlyLifePos = getMonthlyLifePalace(annualLifePos, targetLunarMonth, birthHour, 6); // Uses target lunar month
-
-        // Daily
-        const dailyTrans = getTimeTransformations(targetLunar.getDayGan()); // Uses target day gan
-        const dailyLifePos = getDailyLifePalace(monthlyLifePos, targetLunarDay); // Uses target lunar day
+        // 3. 運限（大運／流年／流月／流日）
+        const horoscope = resolveHoroscope({
+            birthSolar: solar,
+            birthHourBranchIdx: hourBranchIdx,
+            lifePalaceIdx,
+            fiveElementBureau,
+            birthYearStemIndex: yearGanIndex,
+            targetSolar: targetSolar,
+        });
+        const {
+            annualLifePos,
+            decadeLifePos,
+            monthlyLifePos,
+            dailyLifePos,
+            decadeTrans,
+            annualTrans,
+            monthlyTrans,
+            dailyTrans,
+            targetYearStem,
+            targetYearBranch,
+        } = horoscope;
 
         // 4. Construct Chart
         const natalMapping = getFullPalaceMapping ? getFullPalaceMapping(lifePalaceIdx) : {};
@@ -312,24 +312,70 @@ app.post('/api/calculate', (req, res) => {
         let wealthStar = "空宮 (Empty)";
         if (wealthPalaceData.stars.length > 0) wealthStar = wealthPalaceData.stars.join(", ");
 
-        // Match Stocks
-        // Using calculation indices directly for more robustness
         const wealthIdx = calculateWealthPalace(lifePalaceIdx);
-        const propertyIdx = (lifePalaceIdx - 9 + 12) % 12; // Property is 10th palace (index 9 CCW)
-        
-        const finalMatchedStocks = matchStocks({
-            '財帛宮': chart[wealthIdx],
-            '田宅宮': chart[propertyIdx]
-        });
+        const propertyIdx = (lifePalaceIdx - 9 + 12) % 12;
 
-        // Resonance Recommendations
-        const resonanceStocks = recommendResonanceStocks({
-            wealthPalaceBranch: ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"][wealthIdx],
-            wealthStars: chart[wealthIdx] ? chart[wealthIdx].stars.map(s => s.split(' ')[0]) : [],
-            propertyPalaceBranch: ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"][propertyIdx],
-            propertyStars: chart[propertyIdx] ? chart[propertyIdx].stars.map(s => s.split(' ')[0]) : [],
-            bureau: fiveElementBureau
-        });
+        const branchNames = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+        const propertyIdxFromLife = (lifePos) => (lifePos - 9 + 12) % 12;
+
+        const buildPalaceStockRecommendations = (wIdx, pIdx, getStars, withResonance, context = {}) => {
+            const wealthCell = chart[wIdx];
+            const propertyCell = chart[pIdx];
+            const wStars = getStars(wealthCell);
+            const pStars = getStars(propertyCell);
+            const starNames = (stars) => stars.map(s => s.split(' ')[0].trim()).filter(Boolean);
+
+            return {
+                matchedStocks: matchStocks({
+                    '財帛宮': { stars: wStars, branch: branchNames[wIdx] },
+                    '田宅宮': { stars: pStars, branch: branchNames[pIdx] },
+                }, {
+                    periodLabel: context.periodLabel || '本命',
+                    wealthBranch: branchNames[wIdx],
+                    propertyBranch: branchNames[pIdx],
+                }),
+                resonanceStocks: withResonance ? recommendResonanceStocks({
+                    wealthPalaceBranch: branchNames[wIdx],
+                    wealthStars: starNames(wStars),
+                    propertyPalaceBranch: branchNames[pIdx],
+                    propertyStars: starNames(pStars),
+                    bureau: fiveElementBureau,
+                }) : [],
+                wealthBranch: branchNames[wIdx],
+                propertyBranch: branchNames[pIdx],
+                wealthStars: wStars,
+                propertyStars: pStars,
+            };
+        };
+
+        const natalStockRecs = buildPalaceStockRecommendations(
+            wealthIdx,
+            propertyIdx,
+            (cell) => cell?.layers?.natal?.stars || [],
+            false,
+            { periodLabel: '本命' }
+        );
+
+        const flowPeriodDefs = [
+            { key: 'annual', label: '流年', lifePos: annualLifePos, getStars: (cell) => cell?.layers?.annual?.stars || [] },
+            { key: 'monthly', label: '流月', lifePos: monthlyLifePos, getStars: (cell) => cell?.layers?.monthly?.stars || [] },
+            { key: 'daily', label: '流日', lifePos: dailyLifePos, getStars: (cell) => cell?.layers?.daily?.stars || [] },
+        ];
+
+        const flowPeriods = {};
+        for (const period of flowPeriodDefs) {
+            const wIdx = calculateWealthPalace(period.lifePos);
+            const pIdx = propertyIdxFromLife(period.lifePos);
+            flowPeriods[period.key] = {
+                ...buildPalaceStockRecommendations(wIdx, pIdx, period.getStars, true, {
+                    periodLabel: period.label,
+                }),
+                lifeBranch: branchNames[period.lifePos],
+                periodLabel: period.label,
+            };
+        }
+
+        const flowStockRecs = flowPeriods.daily;
 
         const strategy = getInvestmentStrategy(wealthStar, "Unknown");
         
@@ -356,8 +402,16 @@ app.post('/api/calculate', (req, res) => {
             strategy: {
                 ...strategy,
                 wealthStar: wealthStar,
-                matchedStocks: finalMatchedStocks,
-                resonanceStocks: resonanceStocks
+                matchedStocks: natalStockRecs.matchedStocks,
+                resonanceStocks: flowStockRecs.resonanceStocks,
+                stockRecommendations: {
+                    natal: natalStockRecs,
+                    flow: {
+                        periods: flowPeriods,
+                        targetLunarDate: targetLunar.toString(),
+                        dailyLifeBranch: branchNames[dailyLifePos],
+                    }
+                }
             }
         });
 
@@ -513,28 +567,32 @@ function calculateDailyFortune(dateStr, bYear, bMonth, bDay, bHour) {
     // 2. Birth Chart Basic Info
     const birthSolar = Solar.fromYmd(bYear, bMonth, bDay);
     const birthLunar = birthSolar.getLunar();
-    const lifePalaceIdx = calculateLifePalace(birthLunar.getMonth(), bHour);
+    const hourBranchIdx = hourToBranchIndex(bHour);
+    const lifePalaceIdx = calculateLifePalace(birthLunar.getMonth(), hourBranchIdx);
     const yearGanIndex = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"].indexOf(birthLunar.getYearGan());
     const fiveElementBureau = getFiveElementBureau(yearGanIndex, lifePalaceIdx);
 
-    // 3. Locate Flow Palaces
-    const currentYear = targetDate.getFullYear();
-    const targetYearBranchIdx = (currentYear - 4) % 12;
-    const annualLifePos = getAnnualLifePalace(targetYearBranchIdx);
-    const monthlyLifePos = getMonthlyLifePalace(annualLifePos, lunar.getMonth(), bHour, 6);
-    const dailyLifePos = getDailyLifePalace(monthlyLifePos, lunar.getDay());
+    const horoscope = resolveHoroscope({
+        birthSolar,
+        birthHourBranchIdx: hourBranchIdx,
+        lifePalaceIdx,
+        fiveElementBureau,
+        birthYearStemIndex: yearGanIndex,
+        targetSolar: solar,
+    });
+    const {
+        annualLifePos,
+        monthlyLifePos,
+        dailyLifePos,
+        annualTrans,
+        dailyTrans,
+        targetYearStem,
+        dayStem,
+    } = horoscope;
     const dailyWealthPos = calculateWealthPalace(dailyLifePos);
 
-    // 4. Transformations
-    const targetYearStemIdx = (currentYear - 4) % 10;
-    const annualStem = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"][targetYearStemIdx];
-    const annualTrans = getAnnualTransformations(annualStem);
-    
-    const dailyStem = lunar.getDayGan();
-    const dailyTrans = getTimeTransformations(dailyStem);
-
     // 5. Stars in Daily Palaces
-    const ziWeiPos = getZiWeiStarPosition(fiveElementBureau, birthLunar.getDay());
+    const ziWeiPos = getZiWeiStarPosition(fiveElementBureau, getStarPlacementLunarDay(birthSolar, hourBranchIdx));
     const tianFuPos = getTianFuStarPosition(ziWeiPos);
     const allStars = getAllMajorStars(ziWeiPos, tianFuPos);
 
@@ -579,9 +637,9 @@ function calculateDailyFortune(dateStr, bYear, bMonth, bDay, bHour) {
         date: dateStr,
         lunarDate: lunar.toString(),
         user: {
-            annual: { stem: annualStem, lu: annualTrans.lu, ji: annualTrans.ji },
+            annual: { stem: targetYearStem, lu: annualTrans.lu, ji: annualTrans.ji },
             daily: {
-                stem: dailyStem, lu: dailyTrans.lu, ji: dailyTrans.ji,
+                stem: dayStem, lu: dailyTrans.lu, ji: dailyTrans.ji,
                 lifeStars: dailyLifeStars.length > 0 ? dailyLifeStars : ["空宮"],
                 wealthStars: dailyWealthStars.length > 0 ? dailyWealthStars : ["空宮"],
                 lifePosBranch: ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"][dailyLifePos],
@@ -659,14 +717,20 @@ app.get('/api/backtest', async (req, res) => {
 
 
 // Phase 4: AI RL Training SSE Endpoint
+app.get('/api/train/features', (req, res) => {
+    res.json(getFeatureCatalogForUI());
+});
+
 app.get('/api/train', async (req, res) => {
     // 1. Establish SSE Connection
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
     
     // Simulate auth user parameters (in production get from req.user/token)
-    const { year, month, day, hour, epochs = 20, lr, gamma, decay, batch, baseModelId, startDate, endDate } = req.query;
+    const { year, month, day, hour, epochs = 20, lr, gamma, decay, batch, baseModelId, startDate, endDate, features } = req.query;
     
     const hyperParams = {
         learningRate: lr ? parseFloat(lr) : 0.001,
@@ -674,6 +738,14 @@ app.get('/api/train', async (req, res) => {
         epsilonDecay: decay ? parseFloat(decay) : 0.995,
         batchSize: batch ? parseInt(batch) : 32
     };
+    const featureConfig = parseFeatureConfig(features);
+    const stateSize = getStateSize(featureConfig);
+    const marketDim = getMarketDim(featureConfig);
+    const metaDim = stateSize - marketDim;
+    if (stateSize < 3 || metaDim < 1) {
+        res.write(`data: {"error": "至少需要一項命理特徵與一項市場特徵才能訓練雙塔模型"}\n\n`);
+        return res.end();
+    }
     if (!year || !month || !day || !hour) {
         res.write(`data: {"error": "Missing birth data"}\n\n`);
         return res.end();
@@ -696,14 +768,14 @@ app.get('/api/train', async (req, res) => {
         return res.end();
     }
     
-    res.write(`data: {"status": "starting", "epochs": ${epochs}}\n\n`);
+    res.write(`data: {"status": "starting", "epochs": ${epochs}, "stateSize": ${getStateSize(featureConfig)}}\n\n`);
 
     // 3. Start Training using imported trainModel
     try {
         await trainModel(userId, userBirth, marketData, parseInt(epochs), hyperParams, (progress) => {
-            // Callback to push progress
             res.write(`data: ${JSON.stringify(progress)}\n\n`);
-        }, baseModelId);
+            if (typeof res.flush === 'function') res.flush();
+        }, baseModelId, featureConfig);
         
         // Finalize
         res.write(`data: {"status": "done"}\n\n`);

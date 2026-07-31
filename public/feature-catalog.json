@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 4,
+  "categories": [
+    {
+      "id": "technical",
+      "label": "技術指標",
+      "features": [
+        {
+          "key": "price_momentum",
+          "label": "價格動能",
+          "size": 2,
+          "default": true,
+          "required": false,
+          "hint": "近 60 日滾動 Z 分數（自適應波動）與日漲跌幅 %，不受絕對股價影響。"
+        },
+        {
+          "key": "moving_average",
+          "label": "移動平均",
+          "size": 2,
+          "default": true,
+          "required": false,
+          "hint": "MA5 / MA20 偏離度，衡量短中期趨勢方向。"
+        },
+        {
+          "key": "volatility",
+          "label": "波動率",
+          "size": 1,
+          "default": true,
+          "required": false,
+          "hint": "近 20 日報酬率標準差，衡量市場風險水準。"
+        },
+        {
+          "key": "rsi",
+          "label": "RSI",
+          "size": 1,
+          "default": false,
+          "required": false,
+          "hint": "14 日相對強弱指標，辨識超買超賣區間。"
+        }
+      ]
+    },
+    {
+      "id": "volume",
+      "label": "量價數據",
+      "features": [
+        {
+          "key": "volume_change",
+          "label": "成交量變化",
+          "size": 1,
+          "default": true,
+          "required": false,
+          "hint": "相對前日的成交量增減幅度。"
+        },
+        {
+          "key": "volume_level",
+          "label": "量能位階",
+          "size": 1,
+          "default": false,
+          "required": false,
+          "hint": "當日成交量在近 20 日區間中的相對水準。"
+        },
+        {
+          "key": "price_volume_corr",
+          "label": "量價連動",
+          "size": 1,
+          "default": false,
+          "required": false,
+          "hint": "近期價格與成交量同向變動的傾向。"
+        }
+      ]
+    },
+    {
+      "id": "portfolio",
+      "label": "持倉狀態",
+      "features": [
+        {
+          "key": "portfolio",
+          "label": "持倉狀態",
+          "size": 2,
+          "default": true,
+          "required": true,
+          "hint": "現金與持倉佔總資產比例（%），與絕對股價無關，大盤暴漲時仍可比較。"
+        }
+      ]
+    },
+    {
+      "id": "natal",
+      "label": "生辰命盤",
+      "features": [
+        {
+          "key": "natal",
+          "label": "生辰命盤",
+          "size": 9,
+          "default": true,
+          "required": false,
+          "hint": "命宮、財帛宮、五行局與四柱干支。"
+        }
+      ]
+    },
+    {
+      "id": "period",
+      "label": "流年流月流日",
+      "features": [
+        {
+          "key": "decade_wealth",
+          "label": "大運財帛",
+          "size": 8,
+          "default": true,
+          "required": false,
+          "hint": "大運層級財帛宮的四化與主星象。"
+        },
+        {
+          "key": "annual_wealth",
+          "label": "流年財帛",
+          "size": 8,
+          "default": true,
+          "required": false,
+          "hint": "流年層級財帛宮的四化與主星象。"
+        },
+        {
+          "key": "monthly_wealth",
+          "label": "流月財帛",
+          "size": 8,
+          "default": true,
+          "required": false,
+          "hint": "流月層級財帛宮的四化與主星象。"
+        },
+        {
+          "key": "daily_wealth",
+          "label": "流日財帛",
+          "size": 8,
+          "default": true,
+          "required": false,
+          "hint": "流日層級財帛宮的四化與主星象，與靜態策略核心對齊。"
+        }
+      ]
+    },
+    {
+      "id": "calendar",
+      "label": "農曆節律",
+      "features": [
+        {
+          "key": "calendar",
+          "label": "農曆節律",
+          "size": 2,
+          "default": true,
+          "required": false,
+          "hint": "農曆月份與日期正規化值。"
+        },
+        {
+          "key": "moon_cycle",
+          "label": "滿月週期",
+          "size": 4,
+          "default": false,
+          "required": false,
+          "hint": "農曆月相週期編碼（日序、sin/cos 相位、滿月接近度）。"
+        }
+      ]
+    }
+  ],
+  "defaults": {
+    "price_momentum": true,
+    "moving_average": true,
+    "volatility": true,
+    "rsi": false,
+    "volume_change": true,
+    "volume_level": false,
+    "price_volume_corr": false,
+    "portfolio": true,
+    "natal": true,
+    "decade_wealth": true,
+    "annual_wealth": true,
+    "monthly_wealth": true,
+    "daily_wealth": true,
+    "calendar": true,
+    "moon_cycle": false
+  },
+  "order": [
+    "price_momentum",
+    "moving_average",
+    "volatility",
+    "rsi",
+    "volume_change",
+    "volume_level",
+    "price_volume_corr",
+    "portfolio",
+    "natal",
+    "decade_wealth",
+    "annual_wealth",
+    "monthly_wealth",
+    "daily_wealth",
+    "calendar",
+    "moon_cycle"
+  ]
+}

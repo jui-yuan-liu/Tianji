@@ -12,12 +12,51 @@ const PALACE_NAMES = [
   "官祿", "田宅", "福德", "父母"
 ];
 
-// Simplified Star Placement
-function calculateLifePalace(lunarMonth, lunarHour) {
-  // Demo Logic: (Month + Hour) % 12
-  // Real logic needs complex table lookups based on school.
-  // For demo, we use a simple hash to distribute across 12 palaces.
-  return (lunarMonth + lunarHour) % 12;
+function fixIndex(index, cycle = 12) {
+  let i = index;
+  while (i < 0) i += cycle;
+  return i % cycle;
+}
+
+/** 西元 24 小時制 → 時辰索引（對齊 iztro timeToIndex） */
+function hourToBranchIndex(hour24) {
+  const h = ((parseInt(hour24, 10) % 24) + 24) % 24;
+  if (h === 0) return 0;   // 早子時 00:00–00:59
+  if (h === 23) return 12; // 晚子時 23:00–23:59
+  return Math.floor((h + 1) / 2);
+}
+
+/** 晚子時標記(12) → 地支索引 子(0)，供安命宮／流月等使用 */
+function normalizeHourBranchIndex(hourBranchIdx) {
+  return hourBranchIdx >= 12 ? 0 : hourBranchIdx;
+}
+
+function isLateZiHour(hourBranchIdx) {
+  return hourBranchIdx >= 12;
+}
+
+/**
+ * 紫微安星用農曆日：晚子時（23點）換日，其餘用當日。
+ * @param {import('lunar-javascript').Solar} solar
+ */
+function getStarPlacementLunarDay(solar, hourBranchIdx) {
+  if (isLateZiHour(hourBranchIdx)) {
+    return solar.next(1).getLunar().getDay();
+  }
+  return solar.getLunar().getDay();
+}
+
+/**
+ * 安命宮：寅起正月，順數至生月，逆數生時為命宮。
+ * @param {number} lunarMonth 農曆月（1–12）
+ * @param {number} hourBranchIdx 時辰地支索引（子=0 … 亥=11）
+ * @returns {number} 命宮所在地支索引（子=0 … 亥=11）
+ */
+function calculateLifePalace(lunarMonth, hourBranchIdx) {
+  const branchHour = normalizeHourBranchIndex(hourBranchIdx);
+  const monthIndex = lunarMonth - 1;
+  const soulIndexFromYin = fixIndex(monthIndex - branchHour);
+  return fixIndex(soulIndexFromYin + 2);
 }
 
 function calculateWealthPalace(lifePalaceIndex) {
@@ -169,6 +208,11 @@ function getInvestmentStrategy(wealthStarStr, fortuneStarStr) {
 
 module.exports = {
   PALACES: PALACE_NAMES,
+  fixIndex,
+  hourToBranchIndex,
+  normalizeHourBranchIndex,
+  isLateZiHour,
+  getStarPlacementLunarDay,
   calculateLifePalace,
   calculateWealthPalace,
   calculateFortunePalace,

@@ -1,5 +1,5 @@
 
-const { Lunar } = require('lunar-javascript');
+const { fixIndex } = require('./ziwei_core');
 
 // 六十甲子納音表 (Sixty Jiazi Na Yin)
 const NA_YIN = {
@@ -36,16 +36,39 @@ function getFiveElementBureau(yearStemIndex, lifePalaceBranchIndex) {
   return NA_YIN[ganzhi] || 4;
 }
 
-// 紫微星定位 (模擬版)
+/**
+ * 紫微星定位（起紫微星訣）
+ * 局數除日數，商數宮前走；奇偶決定順逆偏移。
+ */
 function getZiWeiStarPosition(bureau, lunarDay) {
-  return (lunarDay % 12); 
+  const fiveElementsValue = bureau;
+  let remainder = -1;
+  let offset = -1;
+  let quotient;
+
+  do {
+    offset++;
+    const divisor = lunarDay + offset;
+    quotient = Math.floor(divisor / fiveElementsValue);
+    remainder = divisor % fiveElementsValue;
+  } while (remainder !== 0);
+
+  quotient %= 12;
+  let ziweiIndexFromYin = quotient - 1;
+  if (offset % 2 === 0) {
+    ziweiIndexFromYin += offset;
+  } else {
+    ziweiIndexFromYin -= offset;
+  }
+
+  return fixIndex(ziweiIndexFromYin + 2);
 }
 
-// 天府星定位 (寅申對沖)
+/** 天府星與紫微相對（以寅宮為起點的索引換算） */
 function getTianFuStarPosition(ziWeiPos) {
-  let pos = 4 - ziWeiPos;
-  if (pos < 0) pos += 12;
-  return pos;
+  const ziweiIndexFromYin = fixIndex(ziWeiPos - 2);
+  const tianfuIndexFromYin = fixIndex(12 - ziweiIndexFromYin);
+  return fixIndex(tianfuIndexFromYin + 2);
 }
 
 // 取得所有主星位置 (完整安星法)
@@ -91,6 +114,7 @@ function getAllMajorStars(ziWeiPos, tianFuPos) {
 }
 
 module.exports = {
+  getTigerStartStem,
   getFiveElementBureau,
   getZiWeiStarPosition,
   getTianFuStarPosition,

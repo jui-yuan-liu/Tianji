@@ -3,45 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tianji 天機 - 登入/註冊</title>
+    <title>Tianji 天機 - 登入</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/dashboard.css">
     <script src="/app.js"></script>
-    <style>
-        body { background-color: #0f172a; color: #f8fafc; }
-        .bg-surface { background-color: #1e293b; }
-    </style>
 </head>
-<body class="flex items-center justify-center min-h-screen relative overflow-hidden">
-    <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 mix-blend-overlay"></div>
-    <div class="absolute -top-[20%] -left-[10%] w-96 h-96 bg-purple-600/20 rounded-full blur-3xl mix-blend-screen"></div>
-    
-    <div class="bg-surface p-8 rounded-2xl shadow-2xl border border-slate-700 w-full max-w-md relative z-10">
-        <h2 class="text-2xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400 mb-6">天機會員系統</h2>
-        
-        <div id="login-form">
-            <input type="text" id="l-user" placeholder="帳號" class="w-full bg-slate-800 border border-slate-600 rounded px-4 py-2 mb-4 text-white focus:border-purple-500 outline-none">
-            <input type="password" id="l-pass" placeholder="密碼" class="w-full bg-slate-800 border border-slate-600 rounded px-4 py-2 mb-6 text-white focus:border-purple-500 outline-none">
-            <button onclick="doLogin()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded shadow-lg transition">登入</button>
-            <div class="text-center mt-4 text-sm text-slate-400 cursor-pointer hover:text-white" onclick="toggleForm()">還沒有帳號？點此註冊</div>
-        </div>
-
-        <div id="register-form" class="hidden">
-            <input type="text" id="r-user" placeholder="帳號" class="w-full bg-slate-800 border border-slate-600 rounded px-4 py-2 mb-2 text-white">
-            <input type="password" id="r-pass" placeholder="密碼" class="w-full bg-slate-800 border border-slate-600 rounded px-4 py-2 mb-2 text-white">
-            <input type="text" id="r-name" placeholder="姓名 / 暱稱" class="w-full bg-slate-800 border border-slate-600 rounded px-4 py-2 mb-4 text-white">
-            
-            <div class="text-xs text-slate-400 mb-2">請設定您的真實出生時間 (西元)</div>
-            <div class="grid grid-cols-4 gap-2 mb-6">
-                <input type="number" id="r-year" placeholder="年(1990)" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-2 text-white text-sm">
-                <input type="number" id="r-month" placeholder="月" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-2 text-white text-sm">
-                <input type="number" id="r-day" placeholder="日" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-2 text-white text-sm">
-                <input type="number" id="r-hour" placeholder="時" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-2 text-white text-sm">
+<body class="dashboard-app no-sidebar">
+    <div class="dash-login-page">
+        <div class="dash-login-card">
+            <div class="mb-8">
+                <div class="dash-brand-icon" style="margin-bottom:14px">機</div>
+                <h2 style="font-size:1.125rem;font-weight:600;color:var(--text-primary);letter-spacing:-0.02em">天機會員</h2>
+                <p style="color:var(--text-muted);font-size:0.8125rem;margin-top:6px">命理智慧 × 量化投資</p>
             </div>
 
-            <button onclick="doRegister()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded shadow-lg transition">註冊並登入</button>
-            <div class="text-center mt-4 text-sm text-slate-400 cursor-pointer hover:text-white" onclick="toggleForm()">已有帳號？返回登入</div>
+            <div id="login-form">
+                <label style="font-size:0.7rem;color:var(--text-muted);display:block;margin-bottom:4px">帳號</label>
+                <input type="text" id="l-user" placeholder="請輸入帳號" class="dash-input w-full mb-4" style="width:100%">
+                <label style="font-size:0.7rem;color:var(--text-muted);display:block;margin-bottom:4px">密碼</label>
+                <input type="password" id="l-pass" placeholder="請輸入密碼" class="dash-input w-full mb-6" style="width:100%">
+                <button onclick="doLogin()" class="dash-btn dash-btn-primary w-full" style="width:100%">登入</button>
+                <div class="text-center mt-4 text-sm cursor-pointer" style="color:var(--text-muted)" onclick="toggleForm()">還沒有帳號？註冊</div>
+            </div>
+
+            <div id="register-form" class="hidden">
+                <input type="text" id="r-user" placeholder="帳號" class="dash-input w-full mb-2" style="width:100%">
+                <input type="password" id="r-pass" placeholder="密碼" class="dash-input w-full mb-2" style="width:100%">
+                <input type="text" id="r-name" placeholder="姓名 / 暱稱" class="dash-input w-full mb-4" style="width:100%">
+                <div class="text-xs mb-2" style="color:var(--text-muted)">出生時間（西元）</div>
+                <div class="dash-form-grid-4 mb-6">
+                    <input type="number" id="r-year" placeholder="年" class="dash-input text-sm">
+                    <input type="number" id="r-month" placeholder="月" class="dash-input text-sm">
+                    <input type="number" id="r-day" placeholder="日" class="dash-input text-sm">
+                    <input type="number" id="r-hour" placeholder="時" class="dash-input text-sm">
+                </div>
+                <button onclick="doRegister()" class="dash-btn dash-btn-primary w-full" style="width:100%">註冊並登入</button>
+                <div class="text-center mt-4 text-sm cursor-pointer" style="color:var(--text-muted)" onclick="toggleForm()">已有帳號？返回登入</div>
+            </div>
+            <div id="msg" class="text-center mt-4 text-sm hidden" style="color:#f87171"></div>
         </div>
-        <div id="msg" class="text-center mt-4 text-sm text-red-400 hidden"></div>
     </div>
 
     <script>
@@ -50,7 +50,6 @@
             document.getElementById('register-form').classList.toggle('hidden');
             document.getElementById('msg').classList.add('hidden');
         }
-
         async function doLogin() {
             const user = document.getElementById('l-user').value;
             const pass = document.getElementById('l-pass').value;
@@ -60,41 +59,33 @@
                     body: JSON.stringify({ username: user, password: pass })
                 });
                 const data = await res.json();
-                if(data.token) {
-                    setToken(data.token);
-                    window.location.href = '/';
-                } else {
-                    showMsg(data.error);
-                }
-            } catch (e) { showMsg('Error logging in'); }
+                if (data.token) { setToken(data.token); window.location.href = '/'; }
+                else showMsg(data.error);
+            } catch (e) { showMsg('登入失敗'); }
         }
-
         async function doRegister() {
             const user = document.getElementById('r-user').value;
             const pass = document.getElementById('r-pass').value;
             const name = document.getElementById('r-name').value;
-            const yr = document.getElementById('r-year').value;
-            const mo = document.getElementById('r-month').value;
-            const da = document.getElementById('r-day').value;
-            const hr = document.getElementById('r-hour').value;
-            
             try {
                 const res = await fetch('/api/users/register', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass, realName: name, birthYear: yr, birthMonth: mo, birthDay: da, birthHour: hr })
+                    body: JSON.stringify({
+                        username: user, password: pass, realName: name,
+                        birthYear: document.getElementById('r-year').value,
+                        birthMonth: document.getElementById('r-month').value,
+                        birthDay: document.getElementById('r-day').value,
+                        birthHour: document.getElementById('r-hour').value
+                    })
                 });
                 const data = await res.json();
-                if(data.message) {
-                    // auto login
+                if (data.message) {
                     document.getElementById('l-user').value = user;
                     document.getElementById('l-pass').value = pass;
                     doLogin();
-                } else {
-                    showMsg(data.error);
-                }
-            } catch (e) { showMsg('Error registering'); }
+                } else showMsg(data.error);
+            } catch (e) { showMsg('註冊失敗'); }
         }
-
         function showMsg(txt) {
             const el = document.getElementById('msg');
             el.innerText = txt;
